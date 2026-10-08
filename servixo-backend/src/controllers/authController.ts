@@ -44,8 +44,8 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   if (role === "worker") {
     await Worker.create({
       user: user._id,
-      verificationStatus: "verified",
-      isAvailable: true,
+      verificationStatus: "pending",
+      isAvailable: false,
     });
   }
 

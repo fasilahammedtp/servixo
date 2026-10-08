@@ -45,7 +45,9 @@ export type NotificationType =
   | "job_completed"
   | "payment_confirmed"
   | "payment_reminder"
-  | "review_received";
+  | "review_received"
+  | "worker_verified"
+  | "worker_rejected";
 
 export interface AppNotification {
   _id: string;

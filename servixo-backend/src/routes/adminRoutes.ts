@@ -6,6 +6,9 @@ import {
   rejectWorker,
   getPlatformStats,
   getPaymentIssues,
+  getAdminUsers,
+  blockUser,
+  unblockUser,
 } from "../controllers/adminController";
 import { requireAuth } from "../middleware/auth";
 import { Request, Response, NextFunction } from "express";
@@ -28,5 +31,9 @@ router.put("/workers/:id/verification", requireAuth, requireAdmin, updateWorkerV
 router.get("/workers/pending", requireAuth, requireAdmin, getPendingWorkers);
 router.patch("/workers/:workerId/verify", requireAuth, requireAdmin, verifyWorker);
 router.patch("/workers/:workerId/reject", requireAuth, requireAdmin, rejectWorker);
+
+router.get("/users", requireAuth, requireAdmin, getAdminUsers);
+router.patch("/users/:userId/block", requireAuth, requireAdmin, blockUser);
+router.patch("/users/:userId/unblock", requireAuth, requireAdmin, unblockUser);
 
 export default router;

@@ -92,7 +92,7 @@ export const findNearbyWorkers = async (
 
   const populatedWorkers = await Worker.populate(matchedWorkers, {
     path: "user",
-    select: "name"
+    select: "name isBlocked"
   });
 
   console.log(
@@ -106,18 +106,23 @@ export const findNearbyWorkers = async (
     }))
   );
 
-  if (customerId) {
-    const custIdStr = customerId.toString();
-    return populatedWorkers.filter((worker: any) => {
+  const custIdStr = customerId ? customerId.toString() : null;
+
+  return populatedWorkers.filter((worker: any) => {
+    if (worker.user && typeof worker.user === "object" && worker.user.isBlocked) {
+      return false;
+    }
+
+    if (custIdStr) {
       const workerUserId =
         worker.user && typeof worker.user === "object" && "_id" in worker.user
           ? worker.user._id.toString()
           : worker.user?.toString();
-      return workerUserId !== custIdStr;
-    });
-  }
+      if (workerUserId === custIdStr) return false;
+    }
 
-  return populatedWorkers;
+    return true;
+  });
 };
 
 export const createJob = asyncHandler(async (req: Request, res: Response) => {

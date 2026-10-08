@@ -38,6 +38,7 @@ export interface PlatformStats {
     completed: number;
   };
   totalCompletedJobs: number;
+  totalPlatformRevenue: number;
 }
 
 export async function getPlatformStats(): Promise<PlatformStats> {
@@ -47,6 +48,7 @@ export async function getPlatformStats(): Promise<PlatformStats> {
 
 export interface PaymentIssueJob {
   _id: string;
+  description?: string;
   finalPrice?: number;
   paymentIssueReported: boolean;
   paymentIssueReportedAt?: string;
@@ -74,3 +76,28 @@ export async function getPaymentIssues(): Promise<PaymentIssueJob[]> {
   const res = await api.get<{ jobs: PaymentIssueJob[] }>("/admin/payment-issues");
   return res.data.jobs;
 }
+
+export interface AdminUser {
+  _id: string;
+  name: string;
+  email: string;
+  role: "customer" | "worker" | "admin";
+  isBlocked: boolean;
+  createdAt: string;
+}
+
+export async function getAdminUsers(params?: { role?: string; search?: string }): Promise<AdminUser[]> {
+  const res = await api.get<{ users: AdminUser[] }>("/admin/users", { params });
+  return res.data.users;
+}
+
+export async function blockUser(userId: string): Promise<AdminUser> {
+  const res = await api.patch<{ user: AdminUser }>(`/admin/users/${userId}/block`);
+  return res.data.user;
+}
+
+export async function unblockUser(userId: string): Promise<AdminUser> {
+  const res = await api.patch<{ user: AdminUser }>(`/admin/users/${userId}/unblock`);
+  return res.data.user;
+}
+

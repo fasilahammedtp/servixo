@@ -8,7 +8,9 @@ export type NotificationType =
   | "job_completed"
   | "payment_confirmed"
   | "payment_reminder"
-  | "review_received";
+  | "review_received"
+  | "worker_verified"
+  | "worker_rejected";
 
 export interface INotification extends Document {
   _id: Types.ObjectId;
@@ -35,6 +37,8 @@ const notificationSchema = new Schema<INotification>(
         "payment_confirmed",
         "payment_reminder",
         "review_received",
+        "worker_verified",
+        "worker_rejected",
       ],
       required: true,
     },

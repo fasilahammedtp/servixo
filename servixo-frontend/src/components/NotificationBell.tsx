@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import { getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead } from "../services/notificationService";
 import { AppNotification } from "../types";
-import { Bell, Briefcase, DollarSign, CheckCircle2, Clock, Star, Truck } from "lucide-react";
+import { Bell, Briefcase, DollarSign, CheckCircle2, Clock, Star, Truck, ShieldCheck, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 function formatTimeAgo(dateString: string) {
@@ -143,6 +143,10 @@ export function NotificationBell() {
         return <DollarSign className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
       case "review_received":
         return <Star className="w-4 h-4 text-amber-500 fill-amber-400" />;
+      case "worker_verified":
+        return <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+      case "worker_rejected":
+        return <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />;
       default:
         return <Bell className="w-4 h-4 text-navy dark:text-amber-300" />;
     }

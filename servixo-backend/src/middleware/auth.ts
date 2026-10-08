@@ -3,7 +3,7 @@ import { verifyToken } from "../utils/jwt";
 import { UserRole } from "../types";
 import { User } from "../models/User";
 
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.headers.authorization;
 
   if (!header || !header.startsWith("Bearer ")) {
@@ -16,6 +16,18 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   try {
     const payload = verifyToken(token);
     req.user = payload;
+
+    const user = await User.findById(payload.userId).select("isBlocked");
+    if (!user) {
+      res.status(401).json({ message: "User not found" });
+      return;
+    }
+
+    if (user.isBlocked) {
+      res.status(403).json({ message: "Your account has been blocked. Please contact support." });
+      return;
+    }
+
     next();
   } catch (err) {
     res.status(401).json({ message: "Invalid or expired token" });

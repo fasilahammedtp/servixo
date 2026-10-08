@@ -331,5 +331,47 @@ export async function sendPaymentReminderEmail(params: SendPaymentReminderEmailP
   });
 }
 
+export interface SendWorkerVerificationEmailParams {
+  to: string;
+  workerName: string;
+  status: "verified" | "rejected";
+}
 
+export async function sendWorkerVerificationEmail(params: SendWorkerVerificationEmailParams) {
+  const { to, workerName, status } = params;
+  const isVerified = status === "verified";
 
+  return await getTransporter().sendMail({
+    from: getFromEmail(),
+    to,
+    subject: isVerified
+      ? "🎉 Your Servixo Worker Account Has Been Approved!"
+      : "Servixo Worker Application Update",
+    html: `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #0f172a; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #f1f5f9;">
+          <h1 style="color: ${isVerified ? "#059669" : "#dc2626"}; font-size: 24px; font-weight: 800; margin-bottom: 8px;">
+            ${isVerified ? `Welcome to Servixo, ${workerName}! 🎉` : `Application Update for ${workerName}`}
+          </h1>
+          <p style="font-size: 15px; color: #475569; margin: 0;">
+            ${isVerified
+              ? "Your worker profile has been reviewed and verified by our admin team."
+              : "Thank you for applying to become a service provider on Servixo."}
+          </p>
+        </div>
+
+        <div style="background-color: ${isVerified ? "#f0fdf4" : "#fef2f2"}; border: 1px solid ${isVerified ? "#bbf7d0" : "#fecaca"}; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+          <p style="margin: 0; font-size: 15px; line-height: 1.5; color: ${isVerified ? "#166534" : "#991b1b"};">
+            ${isVerified
+              ? "Your profile is now active! You can toggle your online status in the worker dashboard to start receiving job requests and sending quotes to customers."
+              : "Unfortunately, your application could not be approved at this time. If you believe this is in error or wish to provide additional documentation, please contact our support team."}
+          </p>
+        </div>
+
+        <p style="font-size: 13px; color: #64748b; text-align: center; margin: 0;">
+          The Servixo Team
+        </p>
+      </div>
+    `,
+  });
+}

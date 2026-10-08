@@ -45,8 +45,6 @@ export const updateWorkerProfile = asyncHandler(async (req: Request, res: Respon
     serviceRadiusKm,
     visitingCharge,
     documents,
-    verificationStatus: "verified",
-    isAvailable: true,
   };
 
   if (location) {
@@ -109,8 +107,8 @@ export const becomeWorker = asyncHandler(async (req: Request, res: Response) => 
     experienceYears: experienceYears || 0,
     serviceRadiusKm: serviceRadiusKm || 10,
     visitingCharge: visitingCharge || 0,
-    verificationStatus: "verified",
-    isAvailable: true,
+    verificationStatus: "pending",
+    isAvailable: false,
   };
 
   if (location) {
