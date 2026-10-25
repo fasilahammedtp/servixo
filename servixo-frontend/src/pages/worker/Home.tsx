@@ -6,10 +6,11 @@ import { getWorkerProfile, toggleAvailability } from "../../services/workerServi
 import { getNearbyJobs, getWorkerDashboardStats } from "../../services/jobService";
 import { createQuotation, getMyQuotations } from "../../services/quotationService";
 import { NotificationBell } from "../../components/NotificationBell";
-import { ThemeToggle } from "../../components/ThemeToggle";
-import { LogoIcon } from "../../components/Logo";
+import { Logo } from "../../components/Logo";
+import { Badge } from "../../components/Badge";
+import { useBadgeSummary } from "../../hooks/useBadgeSummary";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Wrench,
   Zap,
@@ -36,7 +37,11 @@ import {
   Radio,
   Search,
   Lightbulb,
+  MoreHorizontal,
+  MessageSquare,
 } from "lucide-react";
+import { formatJobCategory } from "../../utils/jobUtils";
+import { MessagesUnreadBadge } from "../../components/MessagesUnreadBadge";
 
 const getCategoryIcon = (name: string) => {
   const normalized = name.toLowerCase();
@@ -45,6 +50,7 @@ const getCategoryIcon = (name: string) => {
   if (normalized.includes("clean")) return <HomeIcon className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />;
   if (normalized.includes("paint")) return <Paintbrush className="w-4 h-4 text-purple-500 dark:text-purple-400" />;
   if (normalized.includes("ac") || normalized.includes("repair")) return <Wrench className="w-4 h-4 text-amber-500 dark:text-amber-400" />;
+  if (normalized.includes("other")) return <MoreHorizontal className="w-4 h-4 text-purple-500 dark:text-purple-400" />;
   return <Briefcase className="w-4 h-4 text-blue-500 dark:text-blue-400" />;
 };
 
@@ -87,9 +93,10 @@ function timeAgo(dateString: string) {
 
 export default function WorkerHome() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const { socket } = useSocket();
   const queryClient = useQueryClient();
+  const { data: badgeSummary } = useBadgeSummary();
 
   const [newJobToast, setNewJobToast] = useState<{
     id: string;
@@ -98,7 +105,27 @@ export default function WorkerHome() {
   } | null>(null);
 
   const [quoteSuccessToast, setQuoteSuccessToast] = useState<string | null>(null);
+  const [verificationToast, setVerificationToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [showApprovedBanner, setShowApprovedBanner] = useState(false);
   const [acceptedJobIds, setAcceptedJobIds] = useState<Set<string>>(new Set());
+
+  const location = useLocation();
+
+  // Show toast notification if navigated from profile update or other pages
+  useEffect(() => {
+    const state = location.state as { toastMessage?: string } | null;
+    if (state?.toastMessage) {
+      setQuoteSuccessToast(state.toastMessage);
+      window.history.replaceState({}, document.title);
+      const timer = setTimeout(() => {
+        setQuoteSuccessToast(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
 
   // Modal State for Send Quote
   const [selectedJobForQuote, setSelectedJobForQuote] = useState<any | null>(null);
@@ -106,14 +133,48 @@ export default function WorkerHome() {
   const [quoteMessage, setQuoteMessage] = useState<string>("");
   const [quoteEta, setQuoteEta] = useState<number>(30);
 
-  // Fetch worker profile
+  // Fetch worker profile - poll every 30s while pending, refetch on window focus
   const { data: worker, isLoading: loadingProfile } = useQuery({
     queryKey: ["workerProfile", user?.id],
     queryFn: () => getWorkerProfile(user!.id),
     enabled: !!user?.id,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => {
+      const data = query.state.data as any;
+      return data?.verificationStatus === "pending" ? 30000 : false;
+    },
   });
 
-  // Socket.IO real-time job events
+  // Safety net: refetch worker profile when tab regains focus or becomes visible
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const handleFocusOrVisible = () => {
+      queryClient.invalidateQueries({ queryKey: ["workerProfile", user.id] });
+    };
+
+    window.addEventListener("focus", handleFocusOrVisible);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleFocusOrVisible();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleFocusOrVisible);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [user?.id, queryClient]);
+
+  // Keep AuthContext user and localStorage synchronized with worker.verificationStatus
+  useEffect(() => {
+    if (worker?.verificationStatus && user && user.verificationStatus !== worker.verificationStatus) {
+      updateUser({ verificationStatus: worker.verificationStatus });
+    }
+  }, [worker?.verificationStatus, user, updateUser]);
+
+  // Socket.IO real-time job & notification events
   useEffect(() => {
     if (!socket) return;
 
@@ -131,7 +192,7 @@ export default function WorkerHome() {
 
       setNewJobToast({
         id: newJob._id,
-        categoryName: newJob.category?.name || "New Service Request",
+        categoryName: formatJobCategory(newJob),
         description: newJob.description,
       });
 
@@ -139,7 +200,52 @@ export default function WorkerHome() {
     };
 
     const handleNewNotification = (notification: any) => {
-      if (notification?.type === "quote_accepted") {
+      if (notification?.type === "worker_verified" || notification?.type === "worker_rejected") {
+        const isApproved = notification.type === "worker_verified";
+        const newStatus = isApproved ? "verified" : "rejected";
+
+        // 1. Update React Query cache immediately so the UI transitions smoothly
+        queryClient.setQueryData(["workerProfile", user?.id], (oldWorker: any) => {
+          if (!oldWorker) return oldWorker;
+          return {
+            ...oldWorker,
+            verificationStatus: newStatus,
+          };
+        });
+        queryClient.setQueriesData({ queryKey: ["workerProfile"] }, (oldWorker: any) => {
+          if (!oldWorker) return oldWorker;
+          return {
+            ...oldWorker,
+            verificationStatus: newStatus,
+          };
+        });
+
+        // 2. Invalidate queries to fetch full fresh data in background
+        queryClient.invalidateQueries({ queryKey: ["workerProfile"] });
+        queryClient.invalidateQueries({ queryKey: ["workerDashboardStats"] });
+
+        // 3. Update AuthContext user and localStorage
+        updateUser({ verificationStatus: newStatus });
+
+        // 4. Show success banner/toast or error notification
+        if (isApproved) {
+          setShowApprovedBanner(true);
+          setVerificationToast({
+            type: "success",
+            message: "You have been approved! Turn on Online Availability to start receiving jobs.",
+          });
+        } else {
+          setShowApprovedBanner(false);
+          setVerificationToast({
+            type: "error",
+            message:
+              notification.message ||
+              "Your application was not approved by the administration team.",
+          });
+        }
+
+        setTimeout(() => setVerificationToast(null), 7000);
+      } else if (notification?.type === "quote_accepted") {
         const targetJobId =
           typeof notification.job === "object"
             ? notification.job?._id || notification.job?.id
@@ -203,7 +309,7 @@ export default function WorkerHome() {
       socket.off("new-job", handleNewJob);
       socket.off("new-notification", handleNewNotification);
     };
-  }, [socket, queryClient, worker]);
+  }, [socket, queryClient, worker, user?.id, updateUser]);
 
   // Fetch nearby jobs
   const { data: jobs, isLoading: loadingJobs } = useQuery({
@@ -329,12 +435,12 @@ export default function WorkerHome() {
       <div className="fixed bottom-0 right-1/4 w-[600px] h-[600px] bg-amber-500/5 blur-[160px] pointer-events-none rounded-full" />
 
       {/* Top Navigation Header */}
-      <header className="bg-[#FAF9F5]/90 dark:bg-[#0E1A18]/80 backdrop-blur-xl border-b border-[#EBE6DA] dark:border-[#1A2E2A] px-6 py-4 flex items-center justify-between sticky top-0 z-40 shadow-xs dark:shadow-2xl transition-colors duration-200">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-3">
-            <LogoIcon className="w-9 h-9 rounded-xl shadow-md ring-1 ring-slate-900/5 dark:ring-white/10" />
+      <header className="bg-[#FAF9F5]/90 dark:bg-[#0E1A18]/80 backdrop-blur-xl border-b border-[#EBE6DA] dark:border-[#1A2E2A] px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between sticky top-0 z-40 shadow-xs dark:shadow-2xl transition-colors duration-200">
+        <div className="flex items-center gap-4 sm:gap-8">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <Logo className="w-9 h-9 sm:w-10 sm:h-10" />
             <div>
-              <span className="font-extrabold text-lg text-slate-900 dark:text-white tracking-tight leading-none block">
+              <span className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white tracking-tight leading-none block">
                 Servixo
               </span>
               <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider block mt-0.5">
@@ -352,9 +458,18 @@ export default function WorkerHome() {
             </button>
             <button
               onClick={() => navigate("/worker/my-jobs")}
-              className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#162724] px-4 py-2 rounded-xl transition"
+              className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#162724] px-4 py-2 rounded-xl transition inline-flex items-center gap-1.5"
             >
-              My Hired Jobs
+              <span>My Hired Jobs</span>
+              <Badge count={badgeSummary?.hiredJobs} size="sm" />
+            </button>
+            <button
+              onClick={() => navigate("/worker/messages")}
+              className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#162724] px-4 py-2 rounded-xl transition inline-flex items-center gap-1.5"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Messages</span>
+              <Badge count={badgeSummary?.messages} size="sm" />
             </button>
             <button
               onClick={() => navigate("/worker/profile")}
@@ -365,7 +480,7 @@ export default function WorkerHome() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Dual Role Switcher */}
           <button
             type="button"
@@ -377,14 +492,13 @@ export default function WorkerHome() {
           </button>
 
           <NotificationBell />
-          <ThemeToggle />
 
           <button
             onClick={() => navigate("/worker/profile")}
-            className="flex items-center gap-2.5 pl-1.5 pr-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-[#122320] hover:bg-slate-200 dark:hover:bg-[#192E2A] border border-slate-200 dark:border-[#1E3631] transition group shadow-xs"
+            className="flex items-center gap-2 sm:gap-2.5 pl-1.5 pr-2.5 sm:pr-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-[#122320] hover:bg-slate-200 dark:hover:bg-[#192E2A] border border-slate-200 dark:border-[#1E3631] transition group shadow-xs min-h-[38px]"
             title="Edit Profile"
           >
-            <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-gradient-to-tr dark:from-amber-400 dark:to-emerald-400 text-slate-800 dark:text-slate-950 font-extrabold text-xs flex items-center justify-center overflow-hidden shadow-xs">
+            <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-gradient-to-tr dark:from-amber-400 dark:to-emerald-400 text-slate-800 dark:text-slate-950 font-extrabold text-xs flex items-center justify-center overflow-hidden shadow-xs flex-shrink-0">
               {user?.profilePhoto ? (
                 <img src={user.profilePhoto} alt={user.name} className="w-full h-full object-cover" />
               ) : (
@@ -398,13 +512,43 @@ export default function WorkerHome() {
 
           <button
             onClick={logout}
-            className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition p-2 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-500/10 border border-transparent"
+            className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition p-2 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-500/10 border border-transparent min-w-[36px] min-h-[36px] flex items-center justify-center"
             title="Logout"
           >
             <LogOut className="w-4 h-4" />
           </button>
         </div>
       </header>
+
+      {/* Mobile Worker Navigation Bar */}
+      <div className="md:hidden flex items-center justify-around border-b border-[#EBE6DA] dark:border-[#1A2E2A] bg-white/80 dark:bg-[#0E1A18]/90 backdrop-blur-md px-2 py-2 sticky top-[57px] z-30">
+        <button
+          onClick={() => navigate("/worker")}
+          className="text-xs font-bold text-slate-900 dark:text-amber-400 py-1.5 px-3 rounded-lg bg-slate-100 dark:bg-[#162724] min-h-[36px]"
+        >
+          Requests
+        </button>
+        <button
+          onClick={() => navigate("/worker/my-jobs")}
+          className="text-xs font-semibold text-slate-600 dark:text-slate-400 py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-[#162724] min-h-[36px] flex items-center gap-1.5"
+        >
+          <span>My Jobs</span>
+          <Badge count={badgeSummary?.hiredJobs} size="sm" />
+        </button>
+        <button
+          onClick={() => navigate("/worker/messages")}
+          className="text-xs font-semibold text-slate-600 dark:text-slate-400 py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-[#162724] min-h-[36px] flex items-center gap-1.5"
+        >
+          <span>Messages</span>
+          <Badge count={badgeSummary?.messages} size="sm" />
+        </button>
+        <button
+          onClick={() => navigate("/worker/profile")}
+          className="text-xs font-semibold text-slate-600 dark:text-slate-400 py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-[#162724] min-h-[36px]"
+        >
+          My Profile
+        </button>
+      </div>
 
       {/* Real-time Job Notification Toast */}
       <AnimatePresence>
@@ -451,6 +595,50 @@ export default function WorkerHome() {
         )}
       </AnimatePresence>
 
+      {/* Verification Real-time Status Toast */}
+      <AnimatePresence>
+        {verificationToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className={`fixed top-20 right-6 z-50 max-w-md w-full text-white p-4.5 rounded-2xl shadow-2xl backdrop-blur-2xl flex items-center justify-between gap-3.5 ${
+              verificationToast.type === "success"
+                ? "bg-emerald-950/95 dark:bg-[#0D211A] border-2 border-emerald-400 shadow-emerald-500/20"
+                : "bg-rose-950/95 dark:bg-[#250E12] border-2 border-rose-500/80 shadow-rose-500/20"
+            }`}
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border ${
+                  verificationToast.type === "success"
+                    ? "bg-emerald-500/25 text-emerald-300 border-emerald-400/40"
+                    : "bg-rose-500/25 text-rose-300 border-rose-500/40"
+                }`}
+              >
+                {verificationToast.type === "success" ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-300" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5 text-rose-300" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold leading-relaxed text-white">
+                  {verificationToast.message}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setVerificationToast(null)}
+              className="text-white/70 hover:text-white transition p-1 shrink-0"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main Layout Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         {loadingProfile ? (
@@ -462,7 +650,7 @@ export default function WorkerHome() {
             {/* Left Column Sidebar */}
             <div className="lg:col-span-4 space-y-6">
               {/* Profile Card & Availability Switch */}
-              <div className="bg-white dark:bg-[#0F1B18]/95 backdrop-blur-xl border border-[#EBE6DA] dark:border-[#1C322C] rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative overflow-hidden transition-colors duration-200">
+              <div className="bg-white dark:bg-[#0F1B18]/95 backdrop-blur-xl border border-[#EBE6DA] dark:border-[#1C322C] rounded-2xl p-4 sm:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative overflow-hidden transition-colors duration-200">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-emerald-400 to-emerald-600 opacity-80" />
 
                 <div className="flex items-center gap-4 mb-6">
@@ -485,7 +673,13 @@ export default function WorkerHome() {
                 </div>
 
                 {/* Online Availability Toggle */}
-                <div className="pt-4 border-t border-[#F2ECE1] dark:border-[#1C322C] flex items-center justify-between">
+                <div
+                  className={`pt-4 border-t border-[#F2ECE1] dark:border-[#1C322C] flex items-center justify-between rounded-xl transition-all ${
+                    worker?.verificationStatus === "verified"
+                      ? "p-3 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 shadow-xs"
+                      : ""
+                  }`}
+                >
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-slate-900 dark:text-white">Online Availability</span>
@@ -507,7 +701,12 @@ export default function WorkerHome() {
                     disabled={toggleMutation.isPending || worker?.verificationStatus !== "verified"}
                     className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none ${
                       worker?.isAvailable ? "bg-emerald-600 dark:bg-gradient-to-r dark:from-emerald-500 dark:to-emerald-400" : "bg-slate-300 dark:bg-slate-800"
-                    } ${worker?.verificationStatus !== "verified" ? "opacity-40 cursor-not-allowed" : ""}`}
+                    } ${
+                      worker?.verificationStatus !== "verified"
+                        ? "opacity-40 cursor-not-allowed"
+                        : "cursor-pointer ring-2 ring-emerald-500/40 hover:ring-emerald-400"
+                    }`}
+                    title={worker?.verificationStatus === "verified" ? "Toggle your online availability" : "Requires account verification"}
                   >
                     <span
                       className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-300 shadow-md ${
@@ -519,7 +718,7 @@ export default function WorkerHome() {
               </div>
 
               {/* Profile Metrics Overview */}
-              <div className="bg-white dark:bg-[#0F1B18]/95 backdrop-blur-xl border border-[#EBE6DA] dark:border-[#1C322C] rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] transition-colors duration-200">
+              <div className="bg-white dark:bg-[#0F1B18]/95 backdrop-blur-xl border border-[#EBE6DA] dark:border-[#1C322C] rounded-2xl p-4 sm:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] transition-colors duration-200">
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-amber-500 dark:text-amber-400" /> Profile Metrics
@@ -598,8 +797,60 @@ export default function WorkerHome() {
 
             {/* Right Main Column */}
             <div className="lg:col-span-8 space-y-6">
+              {/* Approval Success Banner */}
+              <AnimatePresence>
+                {showApprovedBanner && worker?.verificationStatus === "verified" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -16, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -16, scale: 0.98 }}
+                    className="p-5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-teal-500/10 border-2 border-emerald-500/40 dark:border-emerald-500/30 shadow-lg relative overflow-hidden"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-start sm:items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                          <CheckCircle2 className="w-6 h-6 animate-pulse" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                            You have been approved!
+                          </h4>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                            Turn on Online Availability to start receiving jobs.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!worker?.isAvailable) {
+                              handleToggleAvailability();
+                            }
+                            setShowApprovedBanner(false);
+                          }}
+                          disabled={toggleMutation.isPending}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-md flex items-center gap-1.5"
+                        >
+                          <Radio className="w-3.5 h-3.5 animate-pulse" />
+                          {worker?.isAvailable ? "Availability is On" : "Turn On Online Availability"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowApprovedBanner(false)}
+                          className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                          title="Dismiss"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Performance Stats Overview Dashboard */}
-              <div className="bg-white dark:bg-[#0F1B18]/95 backdrop-blur-xl border border-[#EBE6DA] dark:border-[#1C322C] rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative overflow-hidden transition-colors duration-200">
+              <div className="bg-white dark:bg-[#0F1B18]/95 backdrop-blur-xl border border-[#EBE6DA] dark:border-[#1C322C] rounded-2xl p-4 sm:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative overflow-hidden transition-colors duration-200">
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-amber-500 dark:text-amber-400" /> Performance Analytics
@@ -609,7 +860,7 @@ export default function WorkerHome() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
                   {/* Card 1 */}
                   <div className="p-4 bg-[#FAF9F5] dark:bg-[#142420] rounded-xl border border-[#EBE6DA] dark:border-[#1E3630] hover:border-emerald-500/40 transition-all duration-300">
                     <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
@@ -655,7 +906,7 @@ export default function WorkerHome() {
                   </div>
 
                   {/* Card 5 */}
-                  <div className="p-4 bg-[#FAF9F5] dark:bg-[#142420] rounded-xl border border-[#EBE6DA] dark:border-[#1E3630] hover:border-emerald-500/40 transition-all duration-300 col-span-2 sm:col-span-1">
+                  <div className="p-4 bg-[#FAF9F5] dark:bg-[#142420] rounded-xl border border-[#EBE6DA] dark:border-[#1E3630] hover:border-emerald-500/40 transition-all duration-300 min-[420px]:col-span-2 sm:col-span-1">
                     <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
                       <span className="text-[11px] font-bold uppercase tracking-wider">Acceptance</span>
                       <TrendingUp className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
@@ -686,7 +937,19 @@ export default function WorkerHome() {
               </div>
 
               {/* Feed Content */}
-              {worker?.verificationStatus !== "verified" ? (
+              {worker?.verificationStatus === "rejected" ? (
+                <div className="bg-white dark:bg-[#0F1B18]/90 backdrop-blur-xl border border-rose-200/80 dark:border-rose-900/40 rounded-2xl p-10 text-center shadow-xs dark:shadow-2xl">
+                  <div className="w-16 h-16 bg-rose-50 dark:bg-rose-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-rose-100 dark:border-rose-500/20 shadow-inner">
+                    <AlertTriangle className="w-8 h-8 text-rose-500 dark:text-rose-400" />
+                  </div>
+                  <h4 className="text-base font-extrabold text-slate-900 dark:text-white mb-2">
+                    Your application was not approved
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+                    Your worker profile was not approved by our administration team. Please reach out to support for more information or assistance.
+                  </p>
+                </div>
+              ) : worker?.verificationStatus !== "verified" ? (
                 <div className="bg-white dark:bg-[#0F1B18]/90 backdrop-blur-xl border border-slate-200/80 dark:border-[#1C322C] rounded-2xl p-10 text-center shadow-xs dark:shadow-2xl">
                   <div className="w-16 h-16 bg-amber-50 dark:bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-100 dark:border-amber-500/20 shadow-inner">
                     <Clock className="w-8 h-8 text-amber-500 dark:text-amber-400" />
@@ -838,8 +1101,8 @@ export default function WorkerHome() {
                         >
                           <div className="flex justify-between items-start mb-4">
                             <span className="inline-flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white bg-slate-100 dark:bg-[#162924] px-3.5 py-1.5 rounded-xl border border-slate-200/60 dark:border-[#213F38]">
-                              {getCategoryIcon(job.category?.name || "")}
-                              {job.category?.name}
+                              {getCategoryIcon(formatJobCategory(job))}
+                              {formatJobCategory(job)}
                             </span>
                             <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5 bg-slate-50 dark:bg-[#142420] px-3 py-1.5 rounded-xl border border-slate-100 dark:border-[#1E3630]">
                               <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -865,8 +1128,8 @@ export default function WorkerHome() {
                             </div>
                           )}
 
-                          <div className="pt-4 border-t border-slate-100 dark:border-[#1C322C] flex items-center justify-between">
-                            <div className="flex items-center gap-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          <div className="pt-4 border-t border-slate-100 dark:border-[#1C322C] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
                               {distance && (
                                 <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-[#162723] px-3 py-1.5 rounded-xl border border-amber-200 dark:border-[#213D37]">
                                   <MapPin className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
@@ -881,17 +1144,17 @@ export default function WorkerHome() {
                             </div>
 
                             {isHired ? (
-                              <span className="inline-flex items-center gap-2 bg-emerald-600 dark:bg-emerald-500 text-white dark:text-slate-950 text-xs font-black px-4 py-2.5 rounded-xl shadow-md">
+                              <span className="inline-flex items-center justify-center gap-2 bg-emerald-600 dark:bg-emerald-500 text-white dark:text-slate-950 text-xs font-black px-4 py-2.5 rounded-xl shadow-md min-h-[40px]">
                                 <Sparkles className="w-4 h-4 text-amber-300" /> Hired!
                               </span>
                             ) : isQuoted ? (
-                              <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 text-xs font-bold px-4 py-2 rounded-xl border border-emerald-200 dark:border-emerald-500/30">
+                              <span className="inline-flex items-center justify-center gap-1.5 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 text-xs font-bold px-4 py-2 rounded-xl border border-emerald-200 dark:border-emerald-500/30 min-h-[40px]">
                                 <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Quote Sent
                               </span>
                             ) : (
                               <button
                                 onClick={() => handleOpenQuoteModal(job)}
-                                className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-gradient-to-r dark:from-amber-400 dark:to-amber-500 dark:hover:from-amber-300 dark:hover:to-amber-400 dark:text-slate-950 font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition shadow-md"
+                                className="w-full sm:w-auto justify-center bg-slate-900 hover:bg-slate-800 text-white dark:bg-gradient-to-r dark:from-amber-400 dark:to-amber-500 dark:hover:from-amber-300 dark:hover:to-amber-400 dark:text-slate-950 font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition shadow-md min-h-[42px]"
                               >
                                 Send Quote <ArrowRight className="w-4 h-4" />
                               </button>
@@ -911,12 +1174,12 @@ export default function WorkerHome() {
       {/* Quote Submission Modal */}
       <AnimatePresence>
         {selectedJobForQuote && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 dark:bg-black/80 backdrop-blur-md">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 dark:bg-black/80 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-white dark:bg-[#0E1A18] rounded-2xl p-6 sm:p-7 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-[#1E3631] relative overflow-hidden"
+              className="bg-white dark:bg-[#0E1A18] rounded-2xl p-4 sm:p-7 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-[#1E3631] relative overflow-hidden"
             >
               <button
                 onClick={() => setSelectedJobForQuote(null)}
@@ -942,7 +1205,7 @@ export default function WorkerHome() {
               <div className="bg-slate-50 dark:bg-[#132320] rounded-xl p-4 mb-6 border border-slate-100 dark:border-[#1C322C]">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs font-extrabold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-[#1A2E2A] px-2.5 py-1 rounded-lg border border-amber-200 dark:border-[#233F39]">
-                    {selectedJobForQuote.category?.name}
+                    {formatJobCategory(selectedJobForQuote)}
                   </span>
                   <span className="text-[11px] text-slate-400">
                     {timeAgo(selectedJobForQuote.createdAt)}

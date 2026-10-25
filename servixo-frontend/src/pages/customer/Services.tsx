@@ -14,31 +14,10 @@ import {
   Home as HomeIcon,
   Sparkles,
   ArrowRight,
+  MoreHorizontal,
 } from "lucide-react";
 import { Category } from "../../types";
-
-const getCategoryIcon = (name: string) => {
-  const normalized = name.toLowerCase();
-  if (normalized.includes("plumb")) return <Droplets className="w-6 h-6" />;
-  if (normalized.includes("electri")) return <Zap className="w-6 h-6" />;
-  if (normalized.includes("clean")) return <HomeIcon className="w-6 h-6" />;
-  if (normalized.includes("paint")) return <Paintbrush className="w-6 h-6" />;
-  if (normalized.includes("ac") || normalized.includes("repair")) return <Wrench className="w-6 h-6" />;
-  return <Briefcase className="w-6 h-6" />;
-};
-
-const getCategoryImage = (name: string) => {
-  const normalized = name.toLowerCase();
-  if (normalized.includes("plumb")) return "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?q=80&w=800&auto=format&fit=crop";
-  if (normalized.includes("electri")) return "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=800&auto=format&fit=crop";
-  if (normalized.includes("clean")) return "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=800&auto=format&fit=crop";
-  if (normalized.includes("paint")) return "https://images.unsplash.com/photo-1734475318787-b2b737296469?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTF8fHBhaW50ZXJ8ZW58MHx8MHx8fDA%3D";
-  if (normalized.includes("ac")) return "https://plus.unsplash.com/premium_photo-1683134512538-7b390d0adc9e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8YWMlMjByZXBhaXJ8ZW58MHx8MHx8fDA%3D";
-  if (normalized.includes("appliance")) return "https://plus.unsplash.com/premium_photo-1661342406124-740ae7a0dd0e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8YXBwbGlhbmNlJTIwcmVwYWlyfGVufDB8fDB8fHww";
-  if (normalized.includes("carpent")) return "https://images.unsplash.com/photo-1544164560-adac3045edb2?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Y2FycGVudGVyfGVufDB8fDB8fHww";
-  if (normalized.includes("repair")) return "https://plus.unsplash.com/premium_photo-1661342406124-740ae7a0dd0e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8YXBwbGlhbmNlJTIwcmVwYWlyfGVufDB8fDB8fHww";
-  return "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=800&auto=format&fit=crop";
-};
+import { getCategoryIcon, resolveCategoryPhoto } from "../../utils/categoryTheme";
 
 export default function Services() {
   const navigate = useNavigate();
@@ -91,7 +70,7 @@ export default function Services() {
           <span className="inline-flex items-center gap-1.5 py-1.5 px-4 rounded-full bg-white dark:bg-gray-800/80 text-accent font-bold text-xs mb-4 border border-[#EBE6DA] dark:border-gray-700/80 backdrop-blur-md shadow-xs">
             <Sparkles className="w-4 h-4 text-accent" /> Professional Home Services
           </span>
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-navy dark:text-white mb-4 tracking-tight">
+          <h1 className="text-3xl sm:text-5xl font-extrabold text-navy dark:text-white mb-4 tracking-tight">
             Explore All <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-emerald-600 dark:to-emerald-400">Services</span>
           </h1>
           <p className="text-gray-600 dark:text-gray-300 text-base sm:text-lg mb-8 font-medium">
@@ -108,7 +87,7 @@ export default function Services() {
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Search services (e.g. Plumbing, Cleaning)..."
-                className="w-full pl-3 pr-4 py-2.5 bg-transparent border-none focus:ring-0 text-navy dark:text-white font-medium placeholder-gray-400 text-sm sm:text-base outline-none"
+                className="w-full pl-3 pr-4 py-2.5 bg-transparent border-none focus:ring-0 text-navy dark:text-white font-medium placeholder-gray-400 text-sm sm:text-base outline-none min-h-[40px]"
               />
             </div>
           </div>
@@ -118,7 +97,7 @@ export default function Services() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-32">
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
               <div
                 key={i}
@@ -135,38 +114,52 @@ export default function Services() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-            {filteredCategories.map((category, i) => (
-              <motion.button
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ scale: 1.03, y: -4 }}
-                transition={{ duration: 0.3, delay: i * 0.05 }}
-                key={category._id}
-                onClick={() => handleSelectCategory(category.name)}
-                className="relative h-60 rounded-[2rem] text-left overflow-hidden group shadow-[0_10px_30px_rgba(0,0,0,0.05)] hover:shadow-[0_25px_50px_rgba(8,112,184,0.2)] transition-all duration-300 border border-white/40 dark:border-gray-700/50 bg-white dark:bg-[#132320] flex flex-col justify-end"
-              >
-                <img
-                  src={getCategoryImage(category.name)}
-                  alt={category.name}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out z-0"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-navy/95 via-navy/40 to-transparent z-10 transition-opacity duration-500 group-hover:opacity-85" />
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6">
+            {filteredCategories.map((category, i) => {
+              const { imageUrl: catImage } = resolveCategoryPhoto(category);
+              const isOther = category.name.toLowerCase() === "other";
 
-                <div className="absolute inset-0 p-5 flex flex-col justify-end z-20">
-                  <div className="w-11 h-11 mb-3 rounded-2xl bg-white/10 backdrop-blur-xl flex items-center justify-center text-white border border-white/20 shadow-lg group-hover:bg-accent group-hover:border-accent group-hover:scale-110 transition-all duration-300">
-                    {getCategoryIcon(category.name)}
+              return (
+                <motion.button
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileHover={{ scale: 1.03, y: -4 }}
+                  transition={{ duration: 0.3, delay: i * 0.05 }}
+                  key={category._id}
+                  onClick={() => handleSelectCategory(category.name)}
+                  className="relative h-60 rounded-[2rem] text-left overflow-hidden group shadow-[0_10px_30px_rgba(0,0,0,0.05)] hover:shadow-[0_25px_50px_rgba(8,112,184,0.2)] transition-all duration-300 border border-white/40 dark:border-gray-700/50 bg-white dark:bg-[#132320] flex flex-col justify-end"
+                >
+                  {catImage ? (
+                    <img
+                      src={catImage}
+                      alt={category.name}
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out z-0"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-navy to-[#132823] flex items-center justify-center overflow-hidden z-0">
+                      <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#10B981_1px,transparent_1px)] [background-size:16px_16px]" />
+                      <div className="opacity-20 transform scale-[2.8] group-hover:scale-[3.2] transition-transform duration-700 text-white pointer-events-none">
+                        {getCategoryIcon(category.name)}
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-navy/95 via-navy/40 to-transparent z-10 transition-opacity duration-500 group-hover:opacity-85" />
+
+                  <div className="absolute inset-0 p-5 flex flex-col justify-end z-20">
+                    <div className="w-11 h-11 mb-3 rounded-2xl bg-white/10 backdrop-blur-xl flex items-center justify-center text-white border border-white/20 shadow-lg group-hover:bg-accent group-hover:border-accent group-hover:scale-110 transition-all duration-300">
+                      {getCategoryIcon(category.name)}
+                    </div>
+                    <h3 className="font-extrabold text-white text-lg sm:text-xl tracking-wide group-hover:text-accent-light transition-colors flex items-center justify-between">
+                      <span>{category.name}</span>
+                      <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                    </h3>
+                    <p className="text-xs text-gray-300 mt-1 line-clamp-2 font-medium opacity-80 group-hover:opacity-100 transition-opacity">
+                      {category.description || (isOther ? "Custom or specialized service requests." : "Book top-rated specialists near you.")}
+                    </p>
                   </div>
-                  <h3 className="font-extrabold text-white text-lg sm:text-xl tracking-wide group-hover:text-accent-light transition-colors flex items-center justify-between">
-                    <span>{category.name}</span>
-                    <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                  </h3>
-                  <p className="text-xs text-gray-300 mt-1 line-clamp-2 font-medium opacity-80 group-hover:opacity-100 transition-opacity">
-                    {category.description || "Book top-rated specialists near you."}
-                  </p>
-                </div>
-              </motion.button>
-            ))}
+                </motion.button>
+              );
+            })}
           </div>
         )}
       </div>

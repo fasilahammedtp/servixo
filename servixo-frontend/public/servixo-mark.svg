@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Servixo">
+  <defs>
+    <!-- Background Rich Emerald -->
+    <linearGradient id="bg-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1B6045"/>
+      <stop offset="45%" stop-color="#0E3526"/>
+      <stop offset="100%" stop-color="#05160F"/>
+    </linearGradient>
+    <radialGradient id="spotlight" cx="50%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#38A77B" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#05160F" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Metallic Gold Gradients -->
+    <linearGradient id="gold-bright" x1="0" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="25%" stop-color="#FFF2CE"/>
+      <stop offset="65%" stop-color="#F5CF75"/>
+      <stop offset="100%" stop-color="#CA8F28"/>
+    </linearGradient>
+
+    <linearGradient id="gold-deep" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F5CE70"/>
+      <stop offset="50%" stop-color="#D49A36"/>
+      <stop offset="100%" stop-color="#8C5812"/>
+    </linearGradient>
+
+    <linearGradient id="gold-bevel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFF8E7"/>
+      <stop offset="35%" stop-color="#F7D78E"/>
+      <stop offset="70%" stop-color="#D9A243"/>
+      <stop offset="100%" stop-color="#9E691A"/>
+    </linearGradient>
+
+    <linearGradient id="gold-rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFF5DC" stop-opacity="0.85"/>
+      <stop offset="50%" stop-color="#D9A244" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#8C5812" stop-opacity="0.6"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000000" flood-opacity="0.65"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle Base with Deep Emerald Glass -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#bg-grad)"/>
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#spotlight)"/>
+  <rect x="36" y="36" width="440" height="440" rx="96" fill="none" stroke="url(#gold-rim)" stroke-width="2.5"/>
+
+  <!-- Master Shield Crest -->
+  <g filter="url(#shadow)">
+    <!-- Outer Shield with Architectural Roof Gable Peak -->
+    <path d="M 256 62 
+             L 430 148 
+             L 430 274 
+             C 430 376 352 442 256 466 
+             C 160 442 82 376 82 274 
+             L 82 148 Z" 
+          fill="url(#gold-bevel)" 
+          stroke="url(#gold-bright)" 
+          stroke-width="2" 
+          stroke-linejoin="round"/>
+
+    <!-- Inner Emerald Core Depth -->
+    <path d="M 256 82 
+             L 410 156 
+             L 410 268 
+             C 410 358 340 416 256 438 
+             C 172 416 102 358 102 268 
+             L 102 156 Z" 
+          fill="#0C2D20"/>
+
+    <!-- Precision Crossed Tools (Screwdriver / Precision Chisel & Mastercraft Spanner) -->
+    <g transform="translate(256, 270) scale(1.42)">
+      <!-- Tool 1: Screwdriver / Chisel (-45 deg) -->
+      <g transform="rotate(-45)">
+        <rect x="-10" y="-70" width="20" height="142" rx="9" fill="url(#gold-deep)"/>
+        <!-- Precision Chisel Tip -->
+        <polygon points="0,-90 -15,-70 15,-70" fill="url(#gold-bright)"/>
+        <!-- Ergonomic Knurled Grip -->
+        <rect x="-13" y="22" width="26" height="44" rx="8" fill="url(#gold-bright)"/>
+        <line x1="-11" y1="34" x2="11" y2="34" stroke="#0C2D20" stroke-width="2.5"/>
+        <line x1="-11" y1="46" x2="11" y2="46" stroke="#0C2D20" stroke-width="2.5"/>
+      </g>
+
+      <!-- Tool 2: Mastercraft Wrench (+45 deg) with crisp cutout silhouette -->
+      <g transform="rotate(45)">
+        <!-- Cutout shadow boundary -->
+        <rect x="-16" y="-55" width="32" height="130" rx="15" fill="#0C2D20"/>
+        <circle cx="0" cy="52" r="26" fill="#0C2D20"/>
+        <path d="M -36 -44 C -36 -78 -18 -90 0 -90 C 18 -90 36 -78 36 -44 L 18 -36 C 18 -60 9 -68 0 -68 C -9 -68 -18 -60 -18 -36 Z" fill="#0C2D20" stroke="#0C2D20" stroke-width="6"/>
+
+        <!-- Wrench gold body -->
+        <rect x="-10" y="-50" width="20" height="122" rx="9" fill="url(#gold-bright)"/>
+        <!-- Wrench Open Jaw Head -->
+        <path d="M -30 -44 C -30 -72 -15 -82 0 -82 C 15 -82 30 -72 30 -44 L 14 -36 C 14 -56 7 -64 0 -64 C -7 -64 -14 -56 -14 -36 Z" fill="url(#gold-bright)"/>
+        <!-- Wrench Box Ring -->
+        <circle cx="0" cy="52" r="20" fill="url(#gold-bright)"/>
+        <circle cx="0" cy="52" r="8" fill="#0C2D20"/>
+      </g>
+
+      <!-- Center Gold Rivet Node -->
+      <circle cx="0" cy="0" r="14" fill="url(#gold-bright)"/>
+      <circle cx="0" cy="0" r="6" fill="#0C2D20"/>
+    </g>
+
+    <!-- Star of Excellence at Apex of Shield -->
+    <path d="M 256 94 Q 256 112 242 112 Q 256 112 256 130 Q 256 112 270 112 Q 256 112 256 94 Z" fill="#FFFFFF"/>
+  </g>
+</svg>

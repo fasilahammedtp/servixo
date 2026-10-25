@@ -1,20 +1,22 @@
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
 import { verifyToken } from "../utils/jwt";
+import { User } from "../models/User";
+import { isOriginAllowed } from "./cors";
 
 let io: Server | null = null;
 
 export function initSocket(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
     cors: {
-      origin: true,
+      origin: isOriginAllowed,
       credentials: true,
       methods: ["GET", "POST"],
     },
     transports: ["polling", "websocket"],
   });
 
-  io.use((socket: Socket, next) => {
+  io.use(async (socket: Socket, next) => {
     try {
       const authHeader = socket.handshake.headers?.authorization;
       const authToken = socket.handshake.auth?.token;
@@ -37,6 +39,16 @@ export function initSocket(httpServer: HttpServer): Server {
       const decoded = verifyToken(token);
       socket.data.userId = decoded.userId;
       socket.data.role = decoded.role;
+
+      const user = await User.findById(decoded.userId).select("isBlocked");
+      if (!user) {
+        return next(new Error("Authentication error: User not found"));
+      }
+
+      if (user.isBlocked) {
+        console.warn(`[Socket.IO Auth REJECTED] User ID ${decoded.userId} is blocked.`);
+        return next(new Error("Authentication error: Account is blocked"));
+      }
 
       console.log(`[Socket.IO Auth SUCCESS] Socket ID ${socket.id} authenticated as User ID: ${decoded.userId} (Role: ${decoded.role})`);
       next();
@@ -81,5 +93,12 @@ export function sendRealtimeNotification(recipientUserId: string, notification: 
       .to(`worker:${recipientUserId}`)
       .to(`customer:${recipientUserId}`)
       .emit("new-notification", notification);
+  }
+}
+
+export function emitToUser(recipientUserId: string, event: string, data: any) {
+  if (io) {
+    console.log(`[Socket.IO Message] Emitting '${event}' to user room: user:${recipientUserId}`);
+    io.to(`user:${recipientUserId}`).emit(event, data);
   }
 }

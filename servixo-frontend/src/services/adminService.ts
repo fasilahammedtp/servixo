@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { Category } from "../types";
 
 export interface PendingWorker {
   _id: string;
@@ -100,4 +101,107 @@ export async function unblockUser(userId: string): Promise<AdminUser> {
   const res = await api.patch<{ user: AdminUser }>(`/admin/users/${userId}/unblock`);
   return res.data.user;
 }
+
+export interface AdminUserCustomerSection {
+  totalJobsPosted: number;
+  countsByStatus: Record<string, number>;
+  totalSpent: number;
+  unpaidCompleted: {
+    count: number;
+    amount: number;
+  };
+  reviewsGiven: number;
+}
+
+export interface AdminUserWorkerSection {
+  verificationStatus: "pending" | "verified" | "rejected";
+  isAvailable: boolean;
+  skills: string[];
+  serviceRadiusKm: number;
+  experienceYears: number;
+  visitingCharge: number;
+  jobsHired: number;
+  countsByStatus: Record<string, number>;
+  completedJobs: number;
+  totalEarnings: number;
+  pendingPayout: number;
+  commissionGenerated: number;
+  quotesSent: number;
+  quotesAccepted: number;
+  acceptanceRate: number;
+  averageRating: number;
+  totalReviews: number;
+  paymentIssuesReported: number;
+}
+
+export interface AdminUserRecentJob {
+  _id: string;
+  category: string;
+  status: string;
+  price?: number;
+  createdAt: string;
+  otherPartyName: string;
+  role: "customer" | "worker";
+}
+
+export interface AdminUserRecentReview {
+  _id: string;
+  rating: number;
+  comment?: string;
+  customerName: string;
+  createdAt: string;
+}
+
+export interface AdminUserDetails {
+  user: {
+    _id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    role: "customer" | "worker" | "admin";
+    isBlocked: boolean;
+    isEmailVerified: boolean;
+    createdAt: string;
+    profilePhoto?: string;
+  };
+  customer: AdminUserCustomerSection | null;
+  worker: AdminUserWorkerSection | null;
+  recentJobs: AdminUserRecentJob[];
+  recentReviews: AdminUserRecentReview[];
+}
+
+export async function getAdminUserDetails(userId: string): Promise<AdminUserDetails> {
+  const res = await api.get<AdminUserDetails>(`/admin/users/${userId}/details`);
+  return res.data;
+}
+
+export async function getAdminCategories(): Promise<Category[]> {
+  const res = await api.get<{ categories: Category[] }>("/admin/categories");
+  return res.data.categories;
+}
+
+export async function createAdminCategory(data: {
+  name: string;
+  icon?: string;
+  image: string;
+  description?: string;
+}): Promise<Category> {
+  const res = await api.post<{ category: Category }>("/admin/categories", data);
+  return res.data.category;
+}
+
+export async function updateAdminCategory(
+  id: string,
+  data: {
+    icon?: string;
+    image?: string;
+    isActive?: boolean;
+    description?: string;
+  }
+): Promise<Category> {
+  const res = await api.patch<{ category: Category }>(`/admin/categories/${id}`, data);
+  return res.data.category;
+}
+
+
 

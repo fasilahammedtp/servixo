@@ -4,8 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
 import { becomeWorker } from "../../services/workerService";
 import { getCategories } from "../../services/categoryService";
-import { LogoIcon } from "../../components/Logo";
-import { ThemeToggle } from "../../components/ThemeToggle";
+import { Logo } from "../../components/Logo";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -64,8 +63,10 @@ export default function BecomeWorker() {
 
   const categoryNames = Array.from(
     new Set([
-      ...DEFAULT_SKILL_OPTIONS,
-      ...(dbCategories?.map((c) => c.name) || []),
+      ...(dbCategories && dbCategories.length > 0
+        ? dbCategories.map((c) => c.name)
+        : DEFAULT_SKILL_OPTIONS),
+      ...skills,
     ])
   );
 
@@ -159,7 +160,7 @@ export default function BecomeWorker() {
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <LogoIcon className="w-10 h-10 rounded-xl shadow-md" />
+          <Logo className="w-10 h-10" />
           <div>
             <h1 className="text-lg font-extrabold text-slate-900 dark:text-white leading-none">Servixo</h1>
             <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider mt-0.5">
@@ -168,9 +169,7 @@ export default function BecomeWorker() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-        </div>
+
       </header>
 
       {/* Hero Header */}

@@ -5,6 +5,7 @@ import {
   Briefcase,
   Check,
   CheckCircle2,
+  ChevronRight,
   Clock,
   DollarSign,
   Loader2,
@@ -29,7 +30,12 @@ import {
   getAdminUsers,
   blockUser,
   unblockUser,
+  type AdminUser,
+  type PendingWorker,
 } from "../../services/adminService";
+import { formatJobCategory } from "../../utils/jobUtils";
+import { UserDetailDrawer } from "../../components/admin/UserDetailDrawer";
+import { CategoryManager } from "../../components/admin/CategoryManager";
 
 function timeAgo(dateString?: string) {
   if (!dateString) return "Unknown";
@@ -53,6 +59,11 @@ export default function Admin() {
 
   const [userSearch, setUserSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<{
+    user: AdminUser;
+    type: "block" | "unblock";
+  } | null>(null);
 
   const { data: stats, isLoading: loadingStats } = useQuery({
     queryKey: ["adminPlatformStats"],
@@ -74,6 +85,10 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
       queryClient.invalidateQueries({ queryKey: ["adminPlatformStats"] });
+      queryClient.invalidateQueries({ queryKey: ["adminUserDetail"] });
+    },
+    onSettled: () => {
+      setConfirmTarget(null);
     },
   });
 
@@ -82,12 +97,17 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
       queryClient.invalidateQueries({ queryKey: ["adminPlatformStats"] });
+      queryClient.invalidateQueries({ queryKey: ["adminUserDetail"] });
+    },
+    onSettled: () => {
+      setConfirmTarget(null);
     },
   });
 
   const { data: workers, isLoading, isError, error } = useQuery({
     queryKey: ["pendingWorkers"],
     queryFn: getPendingWorkers,
+    refetchInterval: 30000,
   });
 
   const {
@@ -102,7 +122,20 @@ export default function Admin() {
 
   const verifyMutation = useMutation({
     mutationFn: verifyWorker,
-    onSuccess: () => {
+    onMutate: async (workerId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["pendingWorkers"] });
+      const previousWorkers = queryClient.getQueryData<PendingWorker[]>(["pendingWorkers"]);
+      queryClient.setQueryData<PendingWorker[]>(["pendingWorkers"], (old = []) =>
+        old.filter((w) => w._id !== workerId)
+      );
+      return { previousWorkers };
+    },
+    onError: (_err, _workerId, context) => {
+      if (context?.previousWorkers) {
+        queryClient.setQueryData(["pendingWorkers"], context.previousWorkers);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["pendingWorkers"] });
       queryClient.invalidateQueries({ queryKey: ["adminPlatformStats"] });
     },
@@ -110,7 +143,20 @@ export default function Admin() {
 
   const rejectMutation = useMutation({
     mutationFn: rejectWorker,
-    onSuccess: () => {
+    onMutate: async (workerId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["pendingWorkers"] });
+      const previousWorkers = queryClient.getQueryData<PendingWorker[]>(["pendingWorkers"]);
+      queryClient.setQueryData<PendingWorker[]>(["pendingWorkers"], (old = []) =>
+        old.filter((w) => w._id !== workerId)
+      );
+      return { previousWorkers };
+    },
+    onError: (_err, _workerId, context) => {
+      if (context?.previousWorkers) {
+        queryClient.setQueryData(["pendingWorkers"], context.previousWorkers);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["pendingWorkers"] });
       queryClient.invalidateQueries({ queryKey: ["adminPlatformStats"] });
     },
@@ -145,7 +191,7 @@ export default function Admin() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             <div className={cardClass}>
               <div className="flex items-center justify-between mb-3">
                 <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 flex items-center justify-center border border-emerald-200/80 dark:border-emerald-800/40 group-hover:scale-110 transition-transform">
@@ -295,7 +341,7 @@ export default function Admin() {
                   stats?.jobsByStatus.completed ?? 0
                 )}
               </p>
-              <p className="text-xs text-slate-500 dark:text-gray-400 font-semibold mt-1">Jobs by Status: Completed</p>
+              <p className="text-xs text-slate-500 dark:text-gray-400 font-semibold mt-1">Completed Jobs</p>
             </div>
           </div>
         </section>
@@ -316,25 +362,25 @@ export default function Admin() {
             </div>
 
             {/* Filter and Search Controls */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 sm:w-64">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search name or email…"
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-2 text-sm bg-white dark:bg-[#132320] border border-[#EBE6DA] dark:border-gray-800 rounded-xl text-navy dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent transition"
+                  className="w-full pl-9 pr-3.5 py-2.5 min-h-[42px] text-sm bg-white dark:bg-[#132320] border border-[#EBE6DA] dark:border-gray-800 rounded-xl text-navy dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent transition"
                 />
               </div>
 
-              <div className="flex items-center bg-white dark:bg-[#132320] border border-[#EBE6DA] dark:border-gray-800 rounded-xl p-1 text-xs font-semibold">
+              <div className="flex items-center justify-between sm:justify-start bg-white dark:bg-[#132320] border border-[#EBE6DA] dark:border-gray-800 rounded-xl p-1 text-xs font-semibold overflow-x-auto">
                 {["all", "customer", "worker", "admin"].map((r) => (
                   <button
                     key={r}
                     type="button"
                     onClick={() => setRoleFilter(r)}
-                    className={`px-3 py-1.5 rounded-lg capitalize transition ${
+                    className={`px-3 py-2 min-h-[38px] rounded-lg capitalize transition whitespace-nowrap ${
                       roleFilter === r
                         ? "bg-accent/15 text-accent dark:bg-accent/25 dark:text-accent font-bold"
                         : "text-gray-500 dark:text-gray-400 hover:text-navy dark:hover:text-white"
@@ -382,15 +428,16 @@ export default function Admin() {
                 return (
                   <div
                     key={u._id}
-                    className="bg-white dark:bg-[#132320] border border-[#EBE6DA] dark:border-gray-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition shadow-xs hover:border-gray-300 dark:hover:border-gray-700"
+                    onClick={() => setSelectedUserId(u._id)}
+                    className="bg-white dark:bg-[#132320] border border-[#EBE6DA] dark:border-gray-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition shadow-xs hover:border-accent/40 dark:hover:border-accent/40 hover:shadow-md cursor-pointer group"
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-accent/10 text-accent font-bold flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-accent/10 text-accent font-bold flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                         {u.name?.charAt(0).toUpperCase() || "?"}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-navy dark:text-white truncate">{u.name}</p>
+                          <p className="font-semibold text-navy dark:text-white truncate group-hover:text-accent transition-colors">{u.name}</p>
                           <span
                             className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
                               u.role === "admin"
@@ -419,17 +466,35 @@ export default function Admin() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <div className="flex items-center gap-2 shrink-0 self-stretch sm:self-center justify-end">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedUserId(u._id);
+                        }}
+                        className="inline-flex items-center justify-center gap-1 bg-accent/10 hover:bg-accent/20 text-accent text-xs font-semibold px-3 py-2 min-h-[40px] rounded-lg transition"
+                      >
+                        Details
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+
                       {isSelf || isAdminUser ? (
-                        <span className="text-xs text-gray-400 dark:text-gray-500 font-medium px-3 py-1.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200/50 dark:border-gray-700/50">
+                        <span
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-gray-400 dark:text-gray-500 font-medium px-3 py-2 min-h-[40px] flex items-center bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200/50 dark:border-gray-700/50"
+                        >
                           {isSelf ? "Your account" : "Admin protected"}
                         </span>
                       ) : u.isBlocked ? (
                         <button
                           type="button"
                           disabled={isActionBusy}
-                          onClick={() => unblockMutation.mutate(u._id)}
-                          className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition disabled:opacity-60"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmTarget({ user: u, type: "unblock" });
+                          }}
+                          className="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 min-h-[40px] rounded-lg transition disabled:opacity-60"
                         >
                           {isActionBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
                           Unblock
@@ -438,8 +503,11 @@ export default function Admin() {
                         <button
                           type="button"
                           disabled={isActionBusy}
-                          onClick={() => blockMutation.mutate(u._id)}
-                          className="inline-flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition disabled:opacity-60"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmTarget({ user: u, type: "block" });
+                          }}
+                          className="inline-flex items-center justify-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-4 py-2 min-h-[40px] rounded-lg transition disabled:opacity-60"
                         >
                           {isActionBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserX className="w-3.5 h-3.5" />}
                           Block User
@@ -452,6 +520,9 @@ export default function Admin() {
             </div>
           )}
         </section>
+
+        {/* Category Management Section */}
+        <CategoryManager />
 
         <section className="mb-12">
           <div className="flex items-center gap-3 mb-6">
@@ -498,7 +569,7 @@ export default function Admin() {
                 >
                   <div className="min-w-0">
                     <p className="font-semibold text-navy dark:text-white truncate">
-                      {job.category?.name || "Uncategorized"} ·{" "}
+                      {formatJobCategory(job)} ·{" "}
                       {typeof job.finalPrice === "number" ? `$${job.finalPrice.toLocaleString()}` : "No price"}
                     </p>
                     {job.description && (
@@ -577,12 +648,12 @@ export default function Admin() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                   <button
                     type="button"
                     disabled={busyId === worker._id}
                     onClick={() => verifyMutation.mutate(worker._id)}
-                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-3.5 py-2 rounded-lg transition disabled:opacity-60"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 min-h-[40px] rounded-lg transition disabled:opacity-60"
                   >
                     {verifyMutation.isPending && verifyMutation.variables === worker._id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -595,7 +666,7 @@ export default function Admin() {
                     type="button"
                     disabled={busyId === worker._id}
                     onClick={() => rejectMutation.mutate(worker._id)}
-                    className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-3.5 py-2 rounded-lg transition disabled:opacity-60"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 min-h-[40px] rounded-lg transition disabled:opacity-60"
                   >
                     {rejectMutation.isPending && rejectMutation.variables === worker._id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -607,6 +678,85 @@ export default function Admin() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* User Detail Drawer */}
+        <UserDetailDrawer
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+          onTriggerConfirm={(user, type) => setConfirmTarget({ user, type })}
+          currentAdminId={currentUser?.id}
+          isActionBusy={blockMutation.isPending || unblockMutation.isPending}
+        />
+
+        {/* Confirmation Modal for Block / Unblock */}
+        {confirmTarget && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/60 dark:bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#132320] border border-[#EBE6DA] dark:border-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+              <div className="flex items-center gap-3.5 mb-4">
+                <div
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                    confirmTarget.type === "block"
+                      ? "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40"
+                      : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
+                  }`}
+                >
+                  {confirmTarget.type === "block" ? (
+                    <UserX className="w-5 h-5" />
+                  ) : (
+                    <UserCheck className="w-5 h-5" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-navy dark:text-white">
+                    {confirmTarget.type === "block" ? "Block User Account" : "Unblock User Account"}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {confirmTarget.user.name} ({confirmTarget.user.email})
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-6">
+                {confirmTarget.type === "block"
+                  ? `Are you sure you want to block ${confirmTarget.user.name}? This user will be immediately logged out and prevented from accessing the platform or booking services.`
+                  : `Are you sure you want to unblock ${confirmTarget.user.name}? They will regain access to log in and use platform services.`}
+              </p>
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setConfirmTarget(null)}
+                  disabled={blockMutation.isPending || unblockMutation.isPending}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition min-h-[40px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={blockMutation.isPending || unblockMutation.isPending}
+                  onClick={() => {
+                    if (confirmTarget.type === "block") {
+                      blockMutation.mutate(confirmTarget.user._id);
+                    } else {
+                      unblockMutation.mutate(confirmTarget.user._id);
+                    }
+                  }}
+                  className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white transition min-h-[40px] shadow-sm ${
+                    confirmTarget.type === "block"
+                      ? "bg-rose-600 hover:bg-rose-700"
+                      : "bg-emerald-600 hover:bg-emerald-700"
+                  }`}
+                >
+                  {(blockMutation.isPending && blockMutation.variables === confirmTarget.user._id) ||
+                  (unblockMutation.isPending && unblockMutation.variables === confirmTarget.user._id) ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : null}
+                  {confirmTarget.type === "block" ? "Confirm Block" : "Confirm Unblock"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>

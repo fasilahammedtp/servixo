@@ -1,46 +1,79 @@
-<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Servixo">
   <defs>
-    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stopColor="#1B3B34" />
-      <stop offset="100%" stopColor="#0E1E1B" />
+    <linearGradient id="fav-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1B6045"/>
+      <stop offset="60%" stop-color="#0E3526"/>
+      <stop offset="100%" stop-color="#05160F"/>
     </linearGradient>
-    <linearGradient id="gold-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stopColor="#F6D389" />
-      <stop offset="50%" stopColor="#E5B25D" />
-      <stop offset="100%" stopColor="#C8933B" />
+    <radialGradient id="fav-spotlight" cx="50%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#38A77B" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#05160F" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fav-gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="25%" stop-color="#FFF2CE"/>
+      <stop offset="65%" stop-color="#F5CF75"/>
+      <stop offset="100%" stop-color="#CA8F28"/>
+    </linearGradient>
+    <linearGradient id="fav-gold-deep" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F5CE70"/>
+      <stop offset="50%" stop-color="#D49A36"/>
+      <stop offset="100%" stop-color="#8C5812"/>
     </linearGradient>
   </defs>
 
-  <!-- Background Card -->
-  <rect width="512" height="512" rx="112" fill="url(#bg-grad)" />
+  <!-- Squircle Base -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#fav-bg)"/>
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#fav-spotlight)"/>
+  <rect x="36" y="36" width="440" height="440" rx="96" fill="none" stroke="url(#fav-gold)" stroke-width="4" stroke-opacity="0.8"/>
 
-  <!-- Inset Border -->
-  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="url(#gold-grad)" strokeWidth="4" opacity="0.3" />
+  <!-- Shield Frame -->
+  <path d="M 256 60 
+           L 432 148 
+           L 432 276 
+           C 432 378 352 444 256 468 
+           C 160 444 80 378 80 276 
+           L 80 148 Z" 
+        fill="url(#fav-gold)" 
+        stroke="url(#fav-gold)" 
+        stroke-width="4" 
+        stroke-linejoin="round"/>
 
-  <!-- Single Clean Wrench angled diagonally -->
-  <g transform="translate(256, 256) rotate(-45) translate(-256, -256)">
-    <!-- Handle -->
-    <rect x="234" y="150" width="44" height="212" rx="18" fill="url(#gold-grad)" />
+  <!-- Emerald Depth -->
+  <path d="M 256 80 
+           L 412 156 
+           L 412 270 
+           C 412 360 340 418 256 440 
+           C 172 418 100 360 100 270 
+           L 100 156 Z" 
+        fill="#0C2D20"/>
 
-    <!-- Top Open-End Jaw Head -->
-    <path d="M 256 90 
-             C 292 90, 320 118, 320 154 
-             C 320 175, 309 193, 293 204 
-             L 219 204 
-             C 203 193, 192 175, 192 154 
-             C 192 118, 220 90, 256 90 Z" 
-          fill="url(#gold-grad)" />
-    
-    <!-- Open Jaw Cutout -->
-    <path d="M 234 85 
-             L 278 85 
-             L 278 140 
-             C 278 152, 268 162, 256 162 
-             C 244 162, 234 152, 234 140 Z" 
-          fill="#162E28" />
+  <!-- High-Contrast Bold Crossed Tools (1.46x scale for favicon clarity) -->
+  <g transform="translate(256, 270) scale(1.46)">
+    <!-- Tool 1: Screwdriver / Chisel (-45 deg) -->
+    <g transform="rotate(-45)">
+      <rect x="-11" y="-70" width="22" height="142" rx="10" fill="url(#fav-gold-deep)"/>
+      <polygon points="0,-92 -17,-70 17,-70" fill="url(#fav-gold)"/>
+      <rect x="-14" y="22" width="28" height="44" rx="8" fill="url(#fav-gold)"/>
+    </g>
 
-    <!-- Bottom Ring Head -->
-    <circle cx="256" cy="362" r="54" fill="url(#gold-grad)" />
-    <circle cx="256" cy="362" r="26" fill="#142823" />
+    <!-- Tool 2: Wrench (+45 deg) with cutout outline -->
+    <g transform="rotate(45)">
+      <rect x="-18" y="-56" width="36" height="132" rx="16" fill="#0C2D20"/>
+      <circle cx="0" cy="52" r="28" fill="#0C2D20"/>
+      <path d="M -38 -44 C -38 -80 -19 -92 0 -92 C 19 -92 38 -80 38 -44 L 19 -36 C 19 -62 10 -70 0 -70 C -10 -70 -19 -62 -19 -36 Z" fill="#0C2D20" stroke="#0C2D20" stroke-width="6"/>
+
+      <rect x="-11" y="-50" width="22" height="122" rx="10" fill="url(#fav-gold)"/>
+      <path d="M -32 -44 C -32 -74 -16 -84 0 -84 C 16 -84 32 -74 32 -44 L 15 -36 C 15 -58 8 -66 0 -66 C -8 -66 -15 -58 -15 -36 Z" fill="url(#fav-gold)"/>
+      <circle cx="0" cy="52" r="22" fill="url(#fav-gold)"/>
+      <circle cx="0" cy="52" r="8" fill="#0C2D20"/>
+    </g>
+
+    <!-- Center Gold Rivet -->
+    <circle cx="0" cy="0" r="15" fill="url(#fav-gold)"/>
+    <circle cx="0" cy="0" r="6" fill="#0C2D20"/>
   </g>
+
+  <!-- Excellence Star -->
+  <path d="M 256 90 Q 256 112 240 112 Q 256 112 256 134 Q 256 112 272 112 Q 256 112 256 90 Z" fill="#FFFFFF"/>
 </svg>

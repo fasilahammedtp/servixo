@@ -20,7 +20,67 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 
   const existing = await User.findOne({ email });
   if (existing) {
-    res.status(400).json({ message: "An account with this email already exists" });
+    if (existing.isEmailVerified) {
+      res.status(400).json({ message: "An account with this email already exists" });
+      return;
+    }
+
+    // Re-signup for unverified account: update existing user details and issue new OTP
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const otp = generateOtp();
+    const hashedOtp = hashOtp(otp);
+
+    existing.name = name;
+    if (phone !== undefined) {
+      existing.phone = phone;
+    }
+    existing.password = hashedPassword;
+    existing.role = role;
+    existing.hasWorkerProfile = role === "worker";
+    existing.hasCustomerProfile = true;
+    existing.otpCode = hashedOtp;
+    existing.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    existing.otpAttempts = 0;
+    await existing.save();
+
+    // Keep Worker document consistent with the chosen role
+    if (role === "worker") {
+      const existingWorker = await Worker.findOne({ user: existing._id });
+      if (!existingWorker) {
+        await Worker.create({
+          user: existing._id,
+          verificationStatus: "pending",
+          isAvailable: false,
+        });
+      }
+    } else {
+      // Remove any pending worker profile created in previous signup attempts
+      await Worker.deleteOne({ user: existing._id });
+    }
+
+    const token = signToken({ userId: existing._id.toString(), role: existing.role });
+
+    // Send OTP email without blocking the response
+    sendOtpEmail(email, otp).catch((error) => {
+      console.warn("Could not send OTP email:", error);
+    });
+
+    res.status(201).json({
+      token,
+      user: {
+        id: existing._id,
+        name: existing.name,
+        email: existing.email,
+        phone: existing.phone,
+        role: existing.role,
+        profilePhoto: existing.profilePhoto,
+        hasWorkerProfile: existing.hasWorkerProfile,
+        hasCustomerProfile: true,
+      },
+      message: "Registration updated. Please verify your email.",
+      ...(process.env.NODE_ENV !== "production" ? { devOnly_otp: otp } : {}),
+      emailSent: true,
+    });
     return;
   }
 
@@ -39,6 +99,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     hasCustomerProfile: true,
     otpCode: hashedOtp,
     otpExpires: new Date(Date.now() + 10 * 60 * 1000),
+    otpAttempts: 0,
   });
 
   if (role === "worker") {
@@ -51,13 +112,10 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 
   const token = signToken({ userId: user._id.toString(), role: user.role });
 
-  let emailSent = false;
-  try {
-    await sendOtpEmail(email, otp);
-    emailSent = true;
-  } catch (error) {
+  // Send OTP email without blocking the response
+  sendOtpEmail(email, otp).catch((error) => {
     console.warn("Could not send OTP email:", error);
-  }
+  });
 
   res.status(201).json({
     token,
@@ -72,8 +130,8 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
       hasCustomerProfile: true,
     },
     message: "Registration successful. Please verify your email.",
-    devOnly_otp: otp,
-    emailSent,
+    ...(process.env.NODE_ENV !== "production" ? { devOnly_otp: otp } : {}),
+    emailSent: true,
   });
 });
 
@@ -94,6 +152,11 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   if (user.isBlocked) {
     res.status(403).json({ message: "This account has been blocked. Contact support." });
+    return;
+  }
+
+  if (!user.isEmailVerified) {
+    res.status(403).json({ message: "Please verify your email first" });
     return;
   }
 
@@ -133,7 +196,7 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
 export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
   const { email, otp } = req.body as { email: string; otp: string };
 
-  const user = await User.findOne({ email }).select("+otpCode +otpExpires");
+  const user = await User.findOne({ email }).select("+otpCode +otpExpires +otpAttempts");
   if (!user) {
     res.status(404).json({ message: "User not found" });
     return;
@@ -141,6 +204,18 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
 
   if (user.isEmailVerified) {
     res.status(200).json({ message: "Account is already verified" });
+    return;
+  }
+
+  const MAX_ATTEMPTS = 5;
+  const currentAttempts = user.otpAttempts || 0;
+
+  if (currentAttempts >= MAX_ATTEMPTS) {
+    user.otpCode = undefined;
+    user.otpExpires = undefined;
+    user.otpAttempts = 0;
+    await user.save();
+    res.status(400).json({ message: "Too many failed attempts. Please request a new OTP." });
     return;
   }
 
@@ -156,7 +231,22 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
 
   const hashedOtp = hashOtp(otp);
   if (hashedOtp !== user.otpCode) {
-    res.status(400).json({ message: "Invalid OTP" });
+    user.otpAttempts = currentAttempts + 1;
+    const remaining = MAX_ATTEMPTS - user.otpAttempts;
+    if (remaining <= 0) {
+      user.otpCode = undefined;
+      user.otpExpires = undefined;
+      user.otpAttempts = 0;
+      await user.save();
+      res.status(400).json({
+        message: "Too many failed attempts. OTP has been invalidated. Please request a new one.",
+      });
+      return;
+    }
+    await user.save();
+    res.status(400).json({
+      message: `Invalid OTP. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`,
+    });
     return;
   }
 
@@ -167,6 +257,7 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
 
   user.otpCode = undefined;
   user.otpExpires = undefined;
+  user.otpAttempts = 0;
   await user.save();
 
   res.status(200).json({ message: "Email verified successfully" });
@@ -191,20 +282,18 @@ export const resendOtp = asyncHandler(async (req: Request, res: Response) => {
 
   user.otpCode = hashedOtp;
   user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+  user.otpAttempts = 0;
   await user.save();
 
-  let emailSent = false;
-  try {
-    await sendOtpEmail(email, otp);
-    emailSent = true;
-  } catch (error) {
+  // Send OTP email without blocking the response
+  sendOtpEmail(email, otp).catch((error) => {
     console.warn("Could not send OTP email:", error);
-  }
+  });
 
   res.status(200).json({
     message: "OTP sent successfully",
-    devOnly_otp: otp,
-    emailSent,
+    ...(process.env.NODE_ENV !== "production" ? { devOnly_otp: otp } : {}),
+    emailSent: true,
   });
 });
 
@@ -243,10 +332,14 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response) =
   res.status(200).json({
     ...genericResponse,
     emailSent,
-    devOnly_resetToken: rawToken,
-    devOnly_note: emailSent
-      ? "Email sent successfully — check your inbox."
-      : "Email could not be sent (expected unless this is your verified Resend address). Use this token to test instead.",
+    ...(process.env.NODE_ENV !== "production"
+      ? {
+          devOnly_resetToken: rawToken,
+          devOnly_note: emailSent
+            ? "Email sent successfully — check your inbox."
+            : "Email could not be sent. Use this token to test instead.",
+        }
+      : {}),
   });
 });
 

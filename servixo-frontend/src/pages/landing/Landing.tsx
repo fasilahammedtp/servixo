@@ -1,8 +1,7 @@
 
 import { Link } from "react-router-dom";
-import { LogoIcon } from "../../components/Logo";
+import { Logo } from "../../components/Logo";
 import { Footer } from "../../components/Footer";
-import { ThemeToggle } from "../../components/ThemeToggle";
 import {
   useEffect,
   useRef,
@@ -265,7 +264,7 @@ function RoleCard({
       <Link
         to="/signup"
         state={{ presetRole: role }}
-        className="block bg-white rounded-[28px] border border-navy/10 overflow-hidden shadow-[0_1px_2px_rgba(11,30,51,0.06)] group-hover:shadow-[0_28px_56px_-18px_rgba(11,30,51,0.28)] group-hover:border-accent/40 transition-shadow duration-500"
+        className="block bg-white dark:bg-[#132320] rounded-[28px] border border-navy/10 dark:border-gray-700/80 overflow-hidden shadow-[0_1px_2px_rgba(11,30,51,0.06)] group-hover:shadow-[0_28px_56px_-18px_rgba(11,30,51,0.28)] group-hover:border-accent/40 transition-shadow duration-500"
       >
         <div className="h-56 relative overflow-hidden">
           {!imgFailed ? (
@@ -309,7 +308,7 @@ function RoleCard({
           </h3>
         </div>
         <div className="p-6">
-          <p className="text-sm text-navy/55 leading-relaxed mb-5">{description}</p>
+          <p className="text-sm text-navy/55 dark:text-gray-300 leading-relaxed mb-5">{description}</p>
           <span className="text-accent text-sm font-medium inline-flex items-center gap-1.5 group-hover:gap-3 transition-all duration-300">
             {ctaLabel}
             <span aria-hidden className="translate-y-[-1px]">→</span>
@@ -379,13 +378,12 @@ export default function Landing() {
     <div className="min-h-screen bg-[#FBFAF8] dark:bg-[#0B1513] text-navy dark:text-gray-100 overflow-x-clip transition-colors duration-300">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-[#FBFAF8]/85 dark:bg-[#101F1C]/90 backdrop-blur-md border-b border-navy/[0.06] dark:border-gray-800/80 transition-colors duration-300">
-        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <LogoIcon className="w-8 h-8 rounded-lg shadow-[0_4px_10px_-2px_rgba(11,30,51,0.4)]" />
+            <Logo className="w-9 h-9 sm:w-10 sm:h-10" />
             <span className="text-navy dark:text-white font-semibold text-lg tracking-tight">Servixo</span>
           </div>
           <div className="flex items-center gap-3">
-            <ThemeToggle />
             <Link
               to="/login"
               className="text-sm font-medium text-navy dark:text-white bg-white dark:bg-gray-800/80 border border-navy/10 dark:border-gray-700/80 px-4 py-2 rounded-full hover:border-accent hover:text-accent dark:hover:text-accent transition-colors"
@@ -397,7 +395,7 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="relative max-w-5xl mx-auto px-6 pt-16 pb-24 grid lg:grid-cols-2 gap-12 items-center">
+      <section className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-16 sm:pb-24 grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
         {/* ambient depth blobs */}
         <div
           aria-hidden
@@ -416,13 +414,13 @@ export default function Landing() {
               Verified · Real-time · Nearby
             </span>
             <h1
-              className="text-4xl sm:text-5xl text-navy dark:text-white leading-[1.08]"
+              className="text-3xl sm:text-5xl text-navy dark:text-white leading-[1.12] sm:leading-[1.08]"
               style={{ fontFamily: "'Fraunces', serif", fontWeight: 560 }}
             >
               Trusted help,{" "}
               <span className="italic text-accent">right around the corner</span>
             </h1>
-            <p className="text-navy/55 dark:text-gray-300 mt-6 max-w-md mx-auto lg:mx-0 leading-relaxed">
+            <p className="text-navy/55 dark:text-gray-300 mt-6 max-w-md mx-auto lg:mx-0 leading-relaxed text-sm sm:text-base">
               The premium marketplace for on-demand home services and professional expertise.
               High-trust, real-time, and reliable.
             </p>
@@ -436,7 +434,7 @@ export default function Landing() {
 
       {/* How it works */}
       <Reveal delayMs={80}>
-        <section className="max-w-4xl mx-auto px-6 pb-20">
+        <section className="max-w-4xl mx-auto px-4 sm:px-6 pb-16 sm:pb-20">
           <h2
             className="text-2xl text-navy dark:text-white text-center mb-12"
             style={{ fontFamily: "'Fraunces', serif", fontWeight: 560 }}
@@ -466,7 +464,7 @@ export default function Landing() {
       </Reveal>
 
       {/* Role cards */}
-      <section className="max-w-4xl mx-auto px-6 grid sm:grid-cols-2 gap-6 pb-20">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 grid sm:grid-cols-2 gap-6 pb-16 sm:pb-20">
         <Reveal delayMs={100}>
           <RoleCard
             role="customer"
@@ -489,7 +487,7 @@ export default function Landing() {
 
       {/* Testimonials */}
       <Reveal delayMs={100}>
-        <section className="max-w-4xl mx-auto px-6 pb-20">
+        <section className="max-w-4xl mx-auto px-4 sm:px-6 pb-16 sm:pb-20">
           <h2
             className="text-2xl text-navy dark:text-white text-center mb-12"
             style={{ fontFamily: "'Fraunces', serif", fontWeight: 560 }}
@@ -527,7 +525,7 @@ export default function Landing() {
       {/* Trust badges */}
       <Reveal delayMs={100}>
         <section className="bg-navy">
-          <div className="max-w-4xl mx-auto px-6 py-12 grid grid-cols-2 sm:grid-cols-4">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-12 grid grid-cols-2 sm:grid-cols-4">
             {badges.map((badge, i) => (
               <div
                 key={badge.label}

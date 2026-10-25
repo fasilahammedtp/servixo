@@ -11,6 +11,7 @@ export interface IJob extends Document {
   customer: Types.ObjectId;
   worker?: Types.ObjectId;
   category: Types.ObjectId;
+  customTitle?: string;
   description: string;
   images: string[];
   location: GeoPoint;
@@ -30,6 +31,7 @@ const jobSchema = new Schema<IJob>(
     customer: { type: Schema.Types.ObjectId, ref: "User", required: true },
     worker: { type: Schema.Types.ObjectId, ref: "Worker" },
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
+    customTitle: { type: String, trim: true, minlength: 3, maxlength: 60 },
     description: { type: String, required: true },
     images: [{ type: String }],
     location: {

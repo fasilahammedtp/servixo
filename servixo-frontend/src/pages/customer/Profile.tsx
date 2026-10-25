@@ -126,7 +126,7 @@ export default function CustomerProfile() {
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-navy transition-colors bg-white dark:bg-[#132320] px-3.5 py-2 rounded-xl border border-[#EBE6DA] dark:border-gray-800 shadow-xs"
+            className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-navy dark:text-gray-400 dark:hover:text-white transition-colors bg-white dark:bg-[#132320] px-3.5 py-2 rounded-xl border border-[#EBE6DA] dark:border-gray-800 shadow-xs"
           >
             <ArrowLeft className="w-4 h-4" /> Back
           </button>
@@ -136,7 +136,7 @@ export default function CustomerProfile() {
         </div>
 
         {/* Profile Card Header */}
-        <div className="bg-white dark:bg-[#132320]/95 border border-[#EBE6DA] dark:border-gray-800 rounded-3xl p-6 sm:p-8 shadow-[0_10px_30px_rgba(0,0,0,0.03)] backdrop-blur-xl relative overflow-hidden">
+        <div className="bg-white dark:bg-[#132320]/95 border border-[#EBE6DA] dark:border-gray-800 rounded-3xl p-4 sm:p-8 shadow-[0_10px_30px_rgba(0,0,0,0.03)] backdrop-blur-xl relative overflow-hidden">
 
           <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-3xl -z-0 pointer-events-none" />
 
@@ -147,7 +147,7 @@ export default function CustomerProfile() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl flex items-center gap-3 text-sm font-semibold"
+                className="mb-6 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 p-4 rounded-2xl flex items-center gap-3 text-sm font-semibold"
               >
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
                 {successMsg}
@@ -162,7 +162,7 @@ export default function CustomerProfile() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="mb-6 bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl flex items-center gap-3 text-sm font-semibold"
+                className="mb-6 bg-red-50 dark:bg-rose-950/40 border border-red-200 dark:border-rose-800/60 text-red-700 dark:text-rose-300 p-4 rounded-2xl flex items-center gap-3 text-sm font-semibold"
               >
                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
                 {errorMsg}
@@ -177,9 +177,9 @@ export default function CustomerProfile() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-8 relative z-10">
               {/* Profile Avatar Upload Section */}
-              <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-gray-100">
+              <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-gray-100 dark:border-gray-800">
                 <div className="relative group">
-                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-navy text-accent font-extrabold text-4xl flex items-center justify-center border-4 border-white shadow-xl overflow-hidden relative">
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-navy text-accent font-extrabold text-4xl flex items-center justify-center border-4 border-white dark:border-gray-800 shadow-xl overflow-hidden relative">
                     {previewPhoto ? (
                       <img
                         src={previewPhoto}
@@ -209,7 +209,7 @@ export default function CustomerProfile() {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="absolute bottom-0 right-0 w-10 h-10 bg-accent hover:bg-amber-400 text-navy rounded-full flex items-center justify-center shadow-lg border-2 border-white transition-all transform hover:scale-105"
+                    className="absolute bottom-0 right-0 w-10 h-10 bg-accent hover:bg-amber-400 text-navy rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800 transition-all transform hover:scale-105"
                     title="Upload Profile Photo"
                   >
                     <Camera className="w-5 h-5" />
@@ -321,7 +321,7 @@ export default function CustomerProfile() {
               </div>
 
               {/* Submit Action */}
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-4">
+              <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-end gap-4">
                 <button
                   type="submit"
                   disabled={saving || uploading}

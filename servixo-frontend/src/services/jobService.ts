@@ -22,9 +22,16 @@ export async function uploadImages(files: File[]) {
   return res.data.urls as string[];
 }
 
-export async function createJob(data: { category: string, description: string, images?: string[], location: { lat: number, lng: number } }) {
+export async function createJob(data: {
+  category: string;
+  customTitle?: string;
+  description: string;
+  images?: string[];
+  location: { lat: number; lng: number };
+  address?: string;
+}) {
   const res = await api.post("/jobs", data);
-  return res.data.job;
+  return res.data;
 }
 
 export async function getNearbyJobs() {

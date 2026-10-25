@@ -5,33 +5,88 @@ import { Category } from "../models/Category";
 import { Worker } from "../models/Worker";
 import { User } from "../models/User";
 import { Quotation } from "../models/Quotation";
+import { Review } from "../models/Review";
+import { Message } from "../models/Message";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { Notification } from "../models/Notification";
 import { getIO, sendRealtimeNotification } from "../config/socket";
 import { sendJobCompletedEmail, sendPaymentConfirmedEmail, sendPaymentReminderEmail } from "../utils/email";
+import { escapeRegex, getJobCategoryDisplay, isSkillMatchForOther } from "../utils/jobUtils";
 
 export const findNearbyWorkers = async (
   coordinates: [number, number],
   categoryId: string | Types.ObjectId,
-  customerId?: string | Types.ObjectId
+  customerId?: string | Types.ObjectId,
+  customTitle?: string
 ) => {
   const [lng, lat] = coordinates;
 
   const category = await Category.findById(categoryId);
   if (!category) {
-    console.log(`Category not found for ID: ${categoryId}`);
     return [];
   }
 
-  console.log(`Category name: ${category.name}, Type: ${typeof category.name}`);
+  const isOther = category.name.trim().toLowerCase() === "other";
 
-  const skillRegex = new RegExp(`^${category.name}$`, "i");
+  let skillMatchCondition: any;
+  if (isOther) {
+    const titleKeywords = (customTitle || "")
+      .match(/[a-zA-Z0-9]+/g)
+      ?.filter((w) => w.length >= 4) || [];
+
+    const keywordRegexConditions = titleKeywords.map((kw) => ({
+      skills: { $regex: escapeRegex(kw), $options: "i" },
+    }));
+
+    skillMatchCondition = {
+      $or: [
+        { skills: { $regex: /^handyman$/i } },
+        ...keywordRegexConditions,
+        {
+          $expr: {
+            $gt: [
+              {
+                $size: {
+                  $filter: {
+                    input: { $ifNull: ["$skills", []] },
+                    as: "s",
+                    cond: {
+                      $and: [
+                        { $gt: [{ $strLenCP: "$$s" }, 0] },
+                        {
+                          $gte: [
+                            {
+                              $indexOfCP: [
+                                { $toLower: customTitle || "" },
+                                { $toLower: "$$s" },
+                              ],
+                            },
+                            0,
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+              0,
+            ],
+          },
+        },
+      ],
+    };
+  } else {
+    const skillRegex = new RegExp(`^${escapeRegex(category.name)}$`, "i");
+    skillMatchCondition = {
+      skills: { $in: [category.name, skillRegex] },
+    };
+  }
 
   const matchStage: any = {
     verificationStatus: "verified",
     isAvailable: true,
-    skills: { $in: [category.name, skillRegex] },
-    $expr: { $lte: ["$distance", "$serviceRadiusKm"] }
+    ...skillMatchCondition,
+    $expr: { $lte: ["$distance", "$serviceRadiusKm"] },
   };
 
   if (customerId) {
@@ -95,16 +150,18 @@ export const findNearbyWorkers = async (
     select: "name isBlocked"
   });
 
-  console.log(
-    "[findNearbyWorkers] Sorted by priorityScore:",
-    populatedWorkers.map((w: any) => ({
-      id: w._id?.toString(),
-      name: w.user?.name,
-      rating: w.rating ?? 0,
-      completedJobsCount: w.completedJobsCount ?? 0,
-      priorityScore: w.priorityScore ?? 0,
-    }))
-  );
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      "[findNearbyWorkers] Sorted by priorityScore:",
+      populatedWorkers.map((w: any) => ({
+        id: w._id?.toString(),
+        name: w.user?.name,
+        rating: w.rating ?? 0,
+        completedJobsCount: w.completedJobsCount ?? 0,
+        priorityScore: w.priorityScore ?? 0,
+      }))
+    );
+  }
 
   const custIdStr = customerId ? customerId.toString() : null;
 
@@ -121,13 +178,18 @@ export const findNearbyWorkers = async (
       if (workerUserId === custIdStr) return false;
     }
 
+    if (isOther) {
+      return isSkillMatchForOther(worker.skills, customTitle);
+    }
+
     return true;
   });
 };
 
 export const createJob = asyncHandler(async (req: Request, res: Response) => {
-  const { category, description, images, location, address } = req.body as {
+  const { category, customTitle, description, images, location, address } = req.body as {
     category: string;
+    customTitle?: string;
     description: string;
     images?: string[];
     location: { lat: number; lng: number };
@@ -140,9 +202,18 @@ export const createJob = asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
+  if (categoryDoc.isActive === false) {
+    res.status(400).json({ message: "This category is currently inactive and cannot accept new requests." });
+    return;
+  }
+
+  const isOther = categoryDoc.name.trim().toLowerCase() === "other";
+  const trimmedCustomTitle = isOther && customTitle ? customTitle.trim() : undefined;
+
   const job = await Job.create({
     customer: req.user?.userId,
     category: categoryDoc._id,
+    customTitle: trimmedCustomTitle,
     description,
     images: images || [],
     location: {
@@ -156,7 +227,8 @@ export const createJob = asyncHandler(async (req: Request, res: Response) => {
   const matchedWorkers = await findNearbyWorkers(
     job.location.coordinates,
     job.category,
-    req.user?.userId
+    req.user?.userId,
+    job.customTitle
   );
 
   try {
@@ -169,6 +241,7 @@ export const createJob = asyncHandler(async (req: Request, res: Response) => {
         _id: categoryDoc._id,
         name: categoryDoc.name
       },
+      customTitle: job.customTitle,
       description: job.description,
       images: job.images,
       location: job.location,
@@ -176,6 +249,8 @@ export const createJob = asyncHandler(async (req: Request, res: Response) => {
       status: job.status,
       createdAt: job.createdAt
     };
+
+    const categoryDisplay = getJobCategoryDisplay({ category: categoryDoc, customTitle: job.customTitle });
 
     for (const matchedWorker of matchedWorkers) {
       let workerUserId: string | null = null;
@@ -196,7 +271,7 @@ export const createJob = asyncHandler(async (req: Request, res: Response) => {
           const notification = await Notification.create({
             recipient: workerUserId,
             type: "job_matched",
-            message: `New ${categoryDoc.name} job request near you`,
+            message: `New ${categoryDisplay} job request near you`,
             job: job._id,
           });
 
@@ -216,18 +291,96 @@ export const createJob = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getMyJobs = asyncHandler(async (req: Request, res: Response) => {
-  const jobs = await Job.find({ customer: req.user?.userId })
+  const userId = req.user?.userId;
+  if (!userId) {
+    res.status(401).json({ message: "Unauthorized" });
+    return;
+  }
+
+  const jobs = await Job.find({ customer: userId })
     .populate("category", "name")
     .populate({
       path: "worker",
       populate: {
         path: "user",
-        select: "name profilePhoto"
-      }
+        select: "name profilePhoto",
+      },
     })
     .sort({ createdAt: -1 });
 
-  res.status(200).json({ jobs });
+  if (jobs.length === 0) {
+    res.status(200).json({ jobs: [] });
+    return;
+  }
+
+  const jobIds = jobs.map((j) => j._id);
+  const userObjectId = new Types.ObjectId(userId);
+
+  const [quotesAgg, unreadAgg, reviews] = await Promise.all([
+    Quotation.aggregate([
+      { $match: { job: { $in: jobIds } } },
+      {
+        $group: {
+          _id: "$job",
+          quotesCount: { $sum: 1 },
+          lowestQuote: { $min: "$price" },
+        },
+      },
+    ]),
+    Message.aggregate([
+      {
+        $match: {
+          recipient: userObjectId,
+          job: { $in: jobIds },
+          readAt: null,
+        },
+      },
+      {
+        $group: {
+          _id: "$job",
+          unreadMessages: { $sum: 1 },
+        },
+      },
+    ]),
+    Review.find(
+      { customer: userObjectId, job: { $in: jobIds } },
+      { job: 1, rating: 1 }
+    ).lean(),
+  ]);
+
+  const quotesMap = new Map<string, { quotesCount: number; lowestQuote: number | null }>();
+  quotesAgg.forEach((q) => {
+    quotesMap.set(q._id.toString(), {
+      quotesCount: q.quotesCount || 0,
+      lowestQuote: q.lowestQuote ?? null,
+    });
+  });
+
+  const unreadMap = new Map<string, number>();
+  unreadAgg.forEach((u) => {
+    unreadMap.set(u._id.toString(), u.unreadMessages || 0);
+  });
+
+  const reviewMap = new Map<string, { rating: number }>();
+  reviews.forEach((r: any) => {
+    reviewMap.set(r.job.toString(), { rating: r.rating });
+  });
+
+  const extendedJobs = jobs.map((job) => {
+    const jobObj = job.toObject();
+    const jId = jobObj._id.toString();
+    const qInfo = quotesMap.get(jId);
+
+    return {
+      ...jobObj,
+      quotesCount: qInfo?.quotesCount ?? 0,
+      lowestQuote: qInfo?.lowestQuote ?? null,
+      unreadMessages: unreadMap.get(jId) ?? 0,
+      review: reviewMap.get(jId) ?? null,
+    };
+  });
+
+  res.status(200).json({ jobs: extendedJobs });
 });
 
 export const getJobById = asyncHandler(async (req: Request, res: Response) => {
@@ -269,18 +422,32 @@ export const getNearbyJobs = asyncHandler(async (req: Request, res: Response) =>
     return;
   }
 
+  const workerSkills = worker.skills || [];
+  const otherCategory = await Category.findOne({ name: /^other$/i });
 
-  let categoryQuery: any = {};
-  if (worker.skills && worker.skills.length > 0) {
-    const regexSkills = worker.skills.map((s) => new RegExp(`^${s}$`, "i"));
+  let categoryIds: Types.ObjectId[] = [];
+  if (workerSkills.length > 0) {
+    const regexSkills = workerSkills.map((s) => new RegExp(`^${escapeRegex(s)}$`, "i"));
     const categories = await Category.find({ name: { $in: regexSkills } });
-    const categoryIds = categories.map((c) => c._id);
-    categoryQuery = { category: { $in: categoryIds } };
+    categoryIds = categories.map((c) => c._id as Types.ObjectId);
+  }
+
+  const orConditions: any[] = [];
+  if (categoryIds.length > 0) {
+    orConditions.push({ category: { $in: categoryIds } });
+  }
+  if (otherCategory) {
+    orConditions.push({ category: otherCategory._id });
+  }
+
+  if (orConditions.length === 0) {
+    res.status(200).json({ jobs: [] });
+    return;
   }
 
   const query: any = {
     status: "pending",
-    ...categoryQuery,
+    $or: orConditions,
   };
 
   if (userId) {
@@ -323,6 +490,16 @@ export const getNearbyJobs = asyncHandler(async (req: Request, res: Response) =>
       return custId !== userId;
     });
   }
+
+  const otherCatIdStr = otherCategory?._id?.toString();
+  geoJobs = geoJobs.filter((j: any) => {
+    const jobCatIdStr = j.category?._id?.toString() || j.category?.toString();
+    const isOtherJob = otherCatIdStr && jobCatIdStr === otherCatIdStr;
+    if (isOtherJob) {
+      return isSkillMatchForOther(workerSkills, j.customTitle);
+    }
+    return true;
+  });
 
   res.status(200).json({ jobs: geoJobs });
 });
@@ -544,7 +721,7 @@ export const completeJob = asyncHandler(async (req: Request, res: Response) => {
     const customerName = customerUser?.name || "Customer";
     const workerUser = worker.user as any;
     const workerName = workerUser?.name || "Service Professional";
-    const categoryName = categoryDoc?.name || "Service";
+    const categoryName = getJobCategoryDisplay({ category: categoryDoc, customTitle: job.customTitle });
 
     if (customerEmail) {
       await sendJobCompletedEmail({
@@ -555,7 +732,7 @@ export const completeJob = asyncHandler(async (req: Request, res: Response) => {
         finalPrice: job.finalPrice,
         jobDescription: job.description,
       });
-      console.log(`[Job Completed Email SUCCESS] Email notification sent to customer: ${customerEmail}`);
+      console.log("[Job Completed Email SUCCESS] Email notification sent to customer");
     }
   } catch (emailErr) {
     console.error("[Job Completed Email ERROR]: Failed to send email to customer:", emailErr);
@@ -611,7 +788,7 @@ export const markJobPaid = asyncHandler(async (req: Request, res: Response) => {
         const workerEmail = workerUser?.email;
         const workerName = workerUser?.name || "Service Professional";
         const customerName = customerUser?.name || "Customer";
-        const categoryName = categoryDoc?.name || "Service";
+        const categoryName = getJobCategoryDisplay({ category: categoryDoc, customTitle: job.customTitle });
 
         if (workerEmail) {
           await sendPaymentConfirmedEmail({
@@ -622,7 +799,7 @@ export const markJobPaid = asyncHandler(async (req: Request, res: Response) => {
             finalPrice: job.finalPrice,
             jobDescription: job.description,
           });
-          console.log(`[Payment Confirmed Email SUCCESS] Email notification sent to worker: ${workerEmail}`);
+          console.log("[Payment Confirmed Email SUCCESS] Email notification sent to worker");
         }
       } catch (emailErr) {
         console.error("[Payment Confirmed Email ERROR]: Failed to send email to worker:", emailErr);
@@ -680,7 +857,7 @@ export const reportPaymentIssue = asyncHandler(async (req: Request, res: Respons
   await job.save();
 
   const categoryDoc = await Category.findById(job.category);
-  const categoryName = categoryDoc?.name || "service";
+  const categoryName = getJobCategoryDisplay({ category: categoryDoc, customTitle: job.customTitle });
 
   const notification = await Notification.create({
     recipient: job.customer,
@@ -706,7 +883,7 @@ export const reportPaymentIssue = asyncHandler(async (req: Request, res: Respons
         finalPrice: job.finalPrice,
         jobDescription: job.description,
       });
-      console.log(`[Payment Reminder Email SUCCESS] Email notification sent to customer: ${customerEmail}`);
+      console.log("[Payment Reminder Email SUCCESS] Email notification sent to customer");
     }
   } catch (emailErr) {
     console.error("[Payment Reminder Email ERROR]: Failed to send email to customer:", emailErr);

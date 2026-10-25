@@ -6,9 +6,10 @@ import { useSocket } from "../../context/SocketContext";
 import { getWorkerProfile, updateWorkerProfile } from "../../services/workerService";
 import { uploadProfilePhoto } from "../../services/userService";
 import { getCategories } from "../../services/categoryService";
-import { LogoIcon } from "../../components/Logo";
+import { Logo } from "../../components/Logo";
 import { NotificationBell } from "../../components/NotificationBell";
-import { ThemeToggle } from "../../components/ThemeToggle";
+import { Badge } from "../../components/Badge";
+import { useBadgeSummary } from "../../hooks/useBadgeSummary";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -52,9 +53,10 @@ const DEFAULT_SKILL_OPTIONS = [
 
 export default function WorkerProfile() {
   const navigate = useNavigate();
-  const { user, updateUser, logout } = useAuth();
+  const { user, updateUser, refreshUser, logout } = useAuth();
   const { socket } = useSocket();
   const queryClient = useQueryClient();
+  const { data: badgeSummary } = useBadgeSummary();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
@@ -62,7 +64,29 @@ export default function WorkerProfile() {
     if (!socket) return;
 
     const handleNewNotification = (notification: any) => {
-      if (notification?.type === "review_received") {
+      if (notification?.type === "worker_verified" || notification?.type === "worker_rejected") {
+        const isApproved = notification.type === "worker_verified";
+        const newStatus = isApproved ? "verified" : "rejected";
+
+        queryClient.setQueryData(["workerProfile", user?.id], (oldWorker: any) => {
+          if (!oldWorker) return oldWorker;
+          return {
+            ...oldWorker,
+            verificationStatus: newStatus,
+          };
+        });
+
+        queryClient.setQueriesData({ queryKey: ["workerProfile"] }, (oldWorker: any) => {
+          if (!oldWorker) return oldWorker;
+          return {
+            ...oldWorker,
+            verificationStatus: newStatus,
+          };
+        });
+
+        queryClient.invalidateQueries({ queryKey: ["workerProfile"] });
+        updateUser({ verificationStatus: newStatus });
+      } else if (notification?.type === "review_received") {
         console.log("⭐ [Worker Profile] Review received event! Invalidating profile & reviews...", notification);
         
         const newRating = notification?.averageRating;
@@ -86,7 +110,7 @@ export default function WorkerProfile() {
     return () => {
       socket.off("new-notification", handleNewNotification);
     };
-  }, [socket, queryClient]);
+  }, [socket, queryClient, user?.id, updateUser]);
 
   const [skills, setSkills] = useState<string[]>([]);
   const [customSkillInput, setCustomSkillInput] = useState("");
@@ -99,6 +123,7 @@ export default function WorkerProfile() {
   
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [invalidFields, setInvalidFields] = useState<Record<string, string>>({});
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -131,20 +156,55 @@ export default function WorkerProfile() {
     queryFn: getCategories,
   });
 
-  // Combine DB categories with defaults
-  const categoryNames = Array.from(
-    new Set([
-      ...DEFAULT_SKILL_OPTIONS,
-      ...(dbCategories?.map((c) => c.name) || []),
-    ])
-  );
-
-  // Fetch worker profile
+  // Fetch worker profile - poll every 30s while pending, refetch on window focus
   const { data: worker, isLoading: loadingProfile } = useQuery({
     queryKey: ["workerProfile", user?.id],
     queryFn: () => getWorkerProfile(user!.id),
     enabled: !!user?.id,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => {
+      const data = query.state.data as any;
+      return data?.verificationStatus === "pending" ? 30000 : false;
+    },
   });
+
+  // Load skills from active categories, while keeping skills worker already has even if hidden or custom
+  const categoryNames = Array.from(
+    new Set([
+      ...(dbCategories?.map((c) => c.name) || []),
+      ...(worker?.skills || []),
+      ...skills,
+    ])
+  );
+
+  // Safety net: refetch worker profile when tab regains focus or becomes visible
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const handleFocusOrVisible = () => {
+      queryClient.invalidateQueries({ queryKey: ["workerProfile", user.id] });
+    };
+
+    window.addEventListener("focus", handleFocusOrVisible);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleFocusOrVisible();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleFocusOrVisible);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [user?.id, queryClient]);
+
+  // Keep AuthContext user and localStorage synchronized with worker.verificationStatus
+  useEffect(() => {
+    if (worker?.verificationStatus && user && user.verificationStatus !== worker.verificationStatus) {
+      updateUser({ verificationStatus: worker.verificationStatus });
+    }
+  }, [worker?.verificationStatus, user, updateUser]);
 
   // Fetch worker reviews
   const { data: reviews, isLoading: loadingReviews } = useQuery({
@@ -188,22 +248,66 @@ export default function WorkerProfile() {
         visitingCharge: payload.visitingCharge,
         location: payload.location,
       }),
-    onSuccess: (updatedWorker) => {
+    onSuccess: async (updatedWorker) => {
+      // 1. Immediately cache updated worker
       queryClient.setQueryData(["workerProfile", user?.id], updatedWorker);
-      queryClient.invalidateQueries({ queryKey: ["workerProfile"] });
-      queryClient.invalidateQueries({ queryKey: ["nearbyJobs"] });
+      // Invalidate queries so that worker dashboard and jobs will refetch
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["workerProfile"] }),
+        queryClient.invalidateQueries({ queryKey: ["nearbyJobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["workerDashboardStats"] }),
+      ]);
 
+      // 2. Refetch the auth user so the dashboard shows updated state immediately
+      try {
+        await refreshUser();
+      } catch (err) {
+        console.warn("Could not refetch auth user:", err);
+      }
+
+      // 3. Show success toast, then navigate to /worker (replace)
       setSuccessMessage("Profile updated successfully!");
-      setTimeout(() => setSuccessMessage(""), 4000);
+      setErrorMessage("");
+      setInvalidFields({});
+
+      setTimeout(() => {
+        navigate("/worker", {
+          replace: true,
+          state: { toastMessage: "Profile updated successfully!" },
+        });
+      }, 800);
     },
     onError: (error: any) => {
-      setErrorMessage(
-        error?.response?.data?.message || "Failed to update profile. Please try again."
-      );
+      const respData = error?.response?.data;
+      const backendMessage =
+        respData?.message || error?.message || "Failed to update profile. Please try again.";
+      const newInvalidFields: Record<string, string> = {};
+
+      if (Array.isArray(respData?.errors) && respData.errors.length > 0) {
+        const fieldErrorMsgs: string[] = [];
+        respData.errors.forEach((e: { field?: string; message: string }) => {
+          if (e.field) {
+            newInvalidFields[e.field] = e.message;
+            fieldErrorMsgs.push(`${e.field}: ${e.message}`);
+          } else {
+            fieldErrorMsgs.push(e.message);
+          }
+        });
+        setErrorMessage(fieldErrorMsgs.join(" | ") || backendMessage);
+      } else {
+        setErrorMessage(backendMessage);
+      }
+
+      setInvalidFields(newInvalidFields);
     },
   });
 
   const toggleSkill = (skill: string) => {
+    setInvalidFields((prev) => {
+      const copy = { ...prev };
+      delete copy.skills;
+      return copy;
+    });
     setSkills((prev) =>
       prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
     );
@@ -214,6 +318,11 @@ export default function WorkerProfile() {
     e.preventDefault();
     const trimmed = customSkillInput.trim();
     if (trimmed && !skills.includes(trimmed)) {
+      setInvalidFields((prev) => {
+        const copy = { ...prev };
+        delete copy.skills;
+        return copy;
+      });
       setSkills((prev) => [...prev, trimmed]);
       setCustomSkillInput("");
     }
@@ -226,6 +335,11 @@ export default function WorkerProfile() {
   const handleGetLocation = () => {
     setLocationLoading(true);
     setLocationError("");
+    setInvalidFields((prev) => {
+      const copy = { ...prev };
+      delete copy.location;
+      return copy;
+    });
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -250,19 +364,28 @@ export default function WorkerProfile() {
     e.preventDefault();
     setErrorMessage("");
     setSuccessMessage("");
+    const errors: Record<string, string> = {};
 
     if (skills.length === 0) {
-      setErrorMessage("Please select at least one skill to receive job matches.");
-      return;
+      errors.skills = "Please select at least one skill to receive job matches.";
     }
 
-    if (experienceYears === "" || Number(experienceYears) < 0) {
-      setErrorMessage("Please enter valid years of experience.");
-      return;
+    if (experienceYears === "" || isNaN(Number(experienceYears)) || Number(experienceYears) < 0) {
+      errors.experienceYears = "Please enter valid years of experience (0 or more).";
     }
 
-    if (visitingCharge === "" || Number(visitingCharge) < 0) {
-      setErrorMessage("Please enter a valid visiting fee.");
+    if (visitingCharge === "" || isNaN(Number(visitingCharge)) || Number(visitingCharge) < 0) {
+      errors.visitingCharge = "Please enter a valid visiting fee (0 or more).";
+    }
+
+    if (serviceRadiusKm < 1) {
+      errors.serviceRadiusKm = "Service radius must be at least 1 km.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setInvalidFields(errors);
+      const firstError = Object.values(errors)[0];
+      setErrorMessage(firstError);
       return;
     }
 
@@ -270,6 +393,8 @@ export default function WorkerProfile() {
       setErrorMessage("User session not found. Please log in again.");
       return;
     }
+
+    setInvalidFields({});
 
     updateMutation.mutate({
       userId: user.id,
@@ -308,26 +433,26 @@ export default function WorkerProfile() {
   return (
     <div className="min-h-screen bg-[#FAF9F5] dark:bg-[#0B1513] font-sans selection:bg-accent/30 overflow-x-hidden transition-colors duration-300">
       {/* Header */}
-      <header className="bg-[#FAF9F5]/90 dark:bg-[#101F1C]/90 backdrop-blur-md border-b border-[#EBE6DA] dark:border-gray-800/80 px-6 py-4 flex items-center justify-between shadow-xs sticky top-0 z-30 transition-colors duration-300">
-        <div className="flex items-center gap-3">
+      <header className="bg-[#FAF9F5]/90 dark:bg-[#101F1C]/90 backdrop-blur-md border-b border-[#EBE6DA] dark:border-gray-800/80 px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between shadow-xs sticky top-0 z-30 transition-colors duration-300">
+        <div className="flex items-center gap-2.5 sm:gap-3">
 
           <button
             onClick={() => navigate("/worker")}
-            className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700/60 flex items-center justify-center text-navy dark:text-white transition-all border border-gray-200 dark:border-gray-700/80"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700/60 flex items-center justify-center text-navy dark:text-white transition-all border border-gray-200 dark:border-gray-700/80"
             title="Back to Dashboard"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <LogoIcon className="w-10 h-10 rounded-xl shadow-md" />
+          <Logo className="w-9 h-9 sm:w-10 sm:h-10" />
           <div>
-            <h1 className="text-lg font-extrabold text-navy dark:text-white leading-none">Servixo</h1>
+            <h1 className="text-base sm:text-lg font-extrabold text-navy dark:text-white leading-none">Servixo</h1>
             <p className="text-[10px] text-accent font-bold uppercase tracking-wider mt-0.5">
               Worker Profile
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => navigate("/home")}
@@ -337,16 +462,45 @@ export default function WorkerProfile() {
             <HomeIcon className="w-3.5 h-3.5" /> Customer View
           </button>
           <NotificationBell />
-          <ThemeToggle />
           <button
             onClick={logout}
-            className="text-gray-400 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20"
+            className="text-gray-400 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 min-w-[36px] min-h-[36px] flex items-center justify-center"
             title="Logout"
           >
             <LogOut className="w-5 h-5" />
           </button>
         </div>
       </header>
+
+      {/* Mobile Worker Navigation Bar */}
+      <div className="md:hidden flex items-center justify-around border-b border-[#EBE6DA] dark:border-gray-800 bg-white/80 dark:bg-[#101F1C]/90 backdrop-blur-md px-2 py-2 sticky top-[57px] z-20">
+        <button
+          onClick={() => navigate("/worker")}
+          className="text-xs font-semibold text-gray-500 dark:text-gray-400 py-1.5 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-h-[36px]"
+        >
+          Requests
+        </button>
+        <button
+          onClick={() => navigate("/worker/my-jobs")}
+          className="text-xs font-semibold text-gray-500 dark:text-gray-400 py-1.5 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-h-[36px] flex items-center gap-1.5"
+        >
+          <span>My Jobs</span>
+          <Badge count={badgeSummary?.hiredJobs} size="sm" />
+        </button>
+        <button
+          onClick={() => navigate("/worker/messages")}
+          className="text-xs font-semibold text-gray-500 dark:text-gray-400 py-1.5 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-h-[36px] flex items-center gap-1.5"
+        >
+          <span>Messages</span>
+          <Badge count={badgeSummary?.messages} size="sm" />
+        </button>
+        <button
+          onClick={() => navigate("/worker/profile")}
+          className="text-xs font-bold text-navy dark:text-accent py-1.5 px-3 rounded-lg bg-navy/5 dark:bg-accent/20 min-h-[36px]"
+        >
+          My Profile
+        </button>
+      </div>
 
       {/* Success Toast */}
       <AnimatePresence>
@@ -379,13 +533,13 @@ export default function WorkerProfile() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-gradient-to-r from-navy via-navy to-blue-900 rounded-[2.5rem] p-6 sm:p-8 text-white shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-6"
+              className="bg-gradient-to-r from-navy via-navy to-blue-900 rounded-3xl sm:rounded-[2.5rem] p-4 sm:p-8 text-white shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-6"
             >
               <div className="absolute top-0 right-0 w-64 h-64 bg-accent/20 rounded-full blur-3xl pointer-events-none" />
 
-              <div className="flex items-center gap-5 relative z-10">
+              <div className="flex flex-col min-[460px]:flex-row items-center min-[460px]:items-start sm:items-center text-center min-[460px]:text-left gap-4 sm:gap-5 relative z-10 w-full sm:w-auto">
                 <div
-                  className="relative group cursor-pointer"
+                  className="relative group cursor-pointer flex-shrink-0"
                   onClick={() => fileInputRef.current?.click()}
                   title="Click to change profile photo"
                 >
@@ -425,10 +579,10 @@ export default function WorkerProfile() {
                   </button>
                 </div>
 
-                <div>
-                  <h2 className="text-2xl font-extrabold tracking-tight">{user?.name}</h2>
-                  <p className="text-xs text-blue-200 font-medium mt-0.5">{user?.email}</p>
-                  <div className="mt-3 flex items-center gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight truncate">{user?.name}</h2>
+                  <p className="text-xs text-blue-200 font-medium mt-0.5 truncate">{user?.email}</p>
+                  <div className="mt-3 flex flex-wrap items-center justify-center min-[460px]:justify-start gap-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider bg-white/10 px-3 py-1 rounded-full text-blue-100 border border-white/10">
                       {user?.role}
                     </span>
@@ -449,14 +603,6 @@ export default function WorkerProfile() {
               </div>
             </motion.div>
 
-            {/* Error Message Box */}
-            {errorMessage && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-600 flex items-center gap-3 shadow-sm">
-                <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
-
             {/* Profile Edit Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Skills Section */}
@@ -464,7 +610,11 @@ export default function WorkerProfile() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="bg-white dark:bg-[#132320] border border-gray-200/80 dark:border-gray-800/80 rounded-[2rem] p-6 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] backdrop-blur-xl transition-colors duration-300"
+                className={`bg-white dark:bg-[#132320] border rounded-2xl sm:rounded-[2rem] p-4 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] backdrop-blur-xl transition-all duration-300 ${
+                  invalidFields.skills
+                    ? "border-red-500 ring-2 ring-red-500/20"
+                    : "border-gray-200/80 dark:border-gray-800/80"
+                }`}
               >
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -490,7 +640,7 @@ export default function WorkerProfile() {
                           key={skill}
                           type="button"
                           onClick={() => toggleSkill(skill)}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 min-h-[40px] ${
                             isSelected
                               ? "bg-navy dark:bg-accent text-white dark:text-navy border-navy dark:border-accent shadow-md scale-105"
                               : "bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700/60 hover:border-navy dark:hover:border-accent hover:text-navy dark:hover:text-white"
@@ -502,6 +652,11 @@ export default function WorkerProfile() {
                       );
                     })}
                   </div>
+                  {invalidFields.skills && (
+                    <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {invalidFields.skills}
+                    </p>
+                  )}
                 </div>
 
                 {/* Add Custom Skill Tag */}
@@ -516,12 +671,12 @@ export default function WorkerProfile() {
                       value={customSkillInput}
                       onChange={(e) => setCustomSkillInput(e.target.value)}
                       onKeyDown={handleAddCustomSkill}
-                      className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-semibold text-navy dark:text-white focus:outline-none focus:ring-2 focus:ring-navy/20 dark:focus:ring-accent/30 focus:border-navy dark:focus:border-accent transition-all"
+                      className="flex-1 px-4 py-2.5 min-h-[42px] bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-semibold text-navy dark:text-white focus:outline-none focus:ring-2 focus:ring-navy/20 dark:focus:ring-accent/30 focus:border-navy dark:focus:border-accent transition-all"
                     />
                     <button
                       type="button"
                       onClick={handleAddCustomSkill}
-                      className="px-4 py-2.5 bg-navy dark:bg-accent hover:bg-accent dark:hover:bg-amber-400 text-white dark:text-navy text-xs font-extrabold rounded-xl transition-all flex items-center gap-1 shadow-sm"
+                      className="px-4 py-2.5 min-h-[42px] bg-navy dark:bg-accent hover:bg-accent dark:hover:bg-amber-400 text-white dark:text-navy text-xs font-extrabold rounded-xl transition-all flex items-center gap-1 shadow-sm"
                     >
                       <Plus className="w-4 h-4" /> Add
                     </button>
@@ -544,7 +699,7 @@ export default function WorkerProfile() {
                           <button
                             type="button"
                             onClick={() => removeSkill(skill)}
-                            className="hover:text-red-500 transition-colors"
+                            className="hover:text-red-500 transition-colors p-1"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -560,7 +715,7 @@ export default function WorkerProfile() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="bg-white dark:bg-[#132320] border border-gray-200/80 dark:border-gray-800/80 rounded-[2rem] p-6 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] grid grid-cols-1 sm:grid-cols-2 gap-6 transition-colors duration-300"
+                className="bg-white dark:bg-[#132320] border border-gray-200/80 dark:border-gray-800/80 rounded-2xl sm:rounded-[2rem] p-4 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] grid grid-cols-1 sm:grid-cols-2 gap-6 transition-colors duration-300"
               >
                 <div>
                   <label className="block text-xs font-bold text-navy dark:text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -574,15 +729,29 @@ export default function WorkerProfile() {
                       required
                       placeholder="e.g. 5"
                       value={experienceYears}
-                      onChange={(e) =>
-                        setExperienceYears(e.target.value === "" ? "" : Number(e.target.value))
-                      }
-                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-bold text-navy dark:text-white focus:outline-none focus:ring-2 focus:ring-navy/20 dark:focus:ring-accent/30 focus:border-navy dark:focus:border-accent transition-all"
+                      onChange={(e) => {
+                        setInvalidFields((prev) => {
+                          const copy = { ...prev };
+                          delete copy.experienceYears;
+                          return copy;
+                        });
+                        setExperienceYears(e.target.value === "" ? "" : Number(e.target.value));
+                      }}
+                      className={`w-full px-4 py-3 bg-gray-50 dark:bg-gray-800/80 border rounded-xl text-sm font-bold text-navy dark:text-white focus:outline-none focus:ring-2 transition-all ${
+                        invalidFields.experienceYears
+                          ? "border-red-500 ring-2 ring-red-500/20 focus:ring-red-500/30"
+                          : "border-gray-200 dark:border-gray-700 focus:ring-navy/20 dark:focus:ring-accent/30 focus:border-navy dark:focus:border-accent"
+                      }`}
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 dark:text-gray-400">
                       Years
                     </span>
                   </div>
+                  {invalidFields.experienceYears && (
+                    <p className="text-xs font-bold text-red-500 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {invalidFields.experienceYears}
+                    </p>
+                  )}
                   <p className="text-[11px] text-gray-400 dark:text-gray-400 mt-1 font-medium">
                     Total years working in your field.
                   </p>
@@ -603,12 +772,26 @@ export default function WorkerProfile() {
                       required
                       placeholder="e.g. 250"
                       value={visitingCharge}
-                      onChange={(e) =>
-                        setVisitingCharge(e.target.value === "" ? "" : Number(e.target.value))
-                      }
-                      className="w-full pl-9 pr-4 py-3 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-bold text-navy dark:text-white focus:outline-none focus:ring-2 focus:ring-navy/20 dark:focus:ring-accent/30 focus:border-navy dark:focus:border-accent transition-all"
+                      onChange={(e) => {
+                        setInvalidFields((prev) => {
+                          const copy = { ...prev };
+                          delete copy.visitingCharge;
+                          return copy;
+                        });
+                        setVisitingCharge(e.target.value === "" ? "" : Number(e.target.value));
+                      }}
+                      className={`w-full pl-9 pr-4 py-3 bg-gray-50 dark:bg-gray-800/80 border rounded-xl text-sm font-bold text-navy dark:text-white focus:outline-none focus:ring-2 transition-all ${
+                        invalidFields.visitingCharge
+                          ? "border-red-500 ring-2 ring-red-500/20 focus:ring-red-500/30"
+                          : "border-gray-200 dark:border-gray-700 focus:ring-navy/20 dark:focus:ring-accent/30 focus:border-navy dark:focus:border-accent"
+                      }`}
                     />
                   </div>
+                  {invalidFields.visitingCharge && (
+                    <p className="text-xs font-bold text-red-500 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {invalidFields.visitingCharge}
+                    </p>
+                  )}
                   <p className="text-[11px] text-gray-400 dark:text-gray-400 mt-1 font-medium">
                     Base inspection/visiting charge proposed to customers.
                   </p>
@@ -620,7 +803,7 @@ export default function WorkerProfile() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="bg-white dark:bg-[#132320] border border-gray-200/80 dark:border-gray-800/80 rounded-[2rem] p-6 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] space-y-6 transition-colors duration-300"
+                className="bg-white dark:bg-[#132320] border border-gray-200/80 dark:border-gray-800/80 rounded-2xl sm:rounded-[2rem] p-4 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] space-y-6 transition-colors duration-300"
               >
                 <div>
                   <div className="flex justify-between items-center mb-2">
@@ -636,9 +819,21 @@ export default function WorkerProfile() {
                     min="1"
                     max="100"
                     value={serviceRadiusKm}
-                    onChange={(e) => setServiceRadiusKm(Number(e.target.value))}
+                    onChange={(e) => {
+                      setInvalidFields((prev) => {
+                        const copy = { ...prev };
+                        delete copy.serviceRadiusKm;
+                        return copy;
+                      });
+                      setServiceRadiusKm(Number(e.target.value));
+                    }}
                     className="w-full accent-navy dark:accent-accent cursor-pointer h-2 bg-gray-200 dark:bg-gray-700 rounded-lg"
                   />
+                  {invalidFields.serviceRadiusKm && (
+                    <p className="text-xs font-bold text-red-500 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {invalidFields.serviceRadiusKm}
+                    </p>
+                  )}
                   <div className="flex justify-between text-[10px] font-bold text-gray-400 dark:text-gray-400 mt-1 uppercase tracking-wider">
                     <span>1 km (Local)</span>
                     <span>50 km</span>
@@ -685,7 +880,7 @@ export default function WorkerProfile() {
                       type="button"
                       onClick={handleGetLocation}
                       disabled={locationLoading}
-                      className="px-4 py-2.5 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-xl text-xs font-bold text-navy dark:text-white transition-all shadow-sm flex items-center gap-2 whitespace-nowrap"
+                      className="w-full sm:w-auto justify-center px-4 py-2.5 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-xl text-xs font-bold text-navy dark:text-white transition-all shadow-sm flex items-center gap-2 whitespace-nowrap min-h-[42px]"
                     >
                       {locationLoading ? (
                         <>
@@ -701,6 +896,11 @@ export default function WorkerProfile() {
                   {locationError && (
                     <p className="text-red-500 text-xs font-bold mt-2">{locationError}</p>
                   )}
+                  {invalidFields.location && (
+                    <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {invalidFields.location}
+                    </p>
+                  )}
                 </div>
               </motion.div>
 
@@ -709,9 +909,9 @@ export default function WorkerProfile() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.35 }}
-                className="bg-white dark:bg-[#132320] border border-gray-200/80 dark:border-gray-800/80 rounded-[2rem] p-6 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] transition-colors duration-300"
+                className="bg-white dark:bg-[#132320] border border-gray-200/80 dark:border-gray-800/80 rounded-2xl sm:rounded-[2rem] p-4 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] transition-colors duration-300"
               >
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
                   <div>
                     <h3 className="text-lg font-extrabold text-navy dark:text-white flex items-center gap-2">
                       <Star className="w-5 h-5 text-amber-400 fill-amber-400" /> Customer Ratings & Reviews
@@ -720,7 +920,7 @@ export default function WorkerProfile() {
                       Feedback from customers after job completion.
                     </p>
                   </div>
-                  <div className="text-right bg-amber-50 dark:bg-amber-950/40 px-4 py-2 rounded-2xl border border-amber-200 dark:border-amber-800/60">
+                  <div className="text-left sm:text-right bg-amber-50 dark:bg-amber-950/40 px-4 py-2 rounded-2xl border border-amber-200 dark:border-amber-800/60">
                     <span className="text-xl font-black text-navy dark:text-amber-300">{worker?.rating ? worker.rating.toFixed(1) : "0.0"} ★</span>
                     <span className="text-[10px] text-amber-800 dark:text-amber-400 block font-bold uppercase tracking-wider">
                       {worker?.totalReviews || 0} Total Reviews
@@ -776,24 +976,38 @@ export default function WorkerProfile() {
                 )}
               </motion.div>
 
-              {/* Submit Button */}
+              {/* Real Error Message near the button */}
+              {errorMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  role="alert"
+                  className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 rounded-2xl text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-3 shadow-sm"
+                >
+                  <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                  <span className="flex-1">{errorMessage}</span>
+                </motion.div>
+              )}
+
+              {/* Submit & Cancel Buttons */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="flex items-center justify-end gap-4 pt-4"
+                className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-4 pt-2"
               >
                 <button
                   type="button"
                   onClick={() => navigate("/worker")}
-                  className="px-6 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+                  disabled={updateMutation.isPending}
+                  className="w-full sm:w-auto px-6 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-center min-h-[44px] disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={updateMutation.isPending}
-                  className="px-8 py-3.5 bg-navy dark:bg-accent hover:bg-accent dark:hover:bg-amber-400 text-white dark:text-navy text-sm font-extrabold rounded-2xl transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2 disabled:opacity-50"
+                  className="w-full sm:w-auto px-8 py-3.5 bg-navy dark:bg-accent hover:bg-accent dark:hover:bg-amber-400 text-white dark:text-navy text-sm font-extrabold rounded-2xl transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                 >
                   {updateMutation.isPending ? (
                     <>

@@ -1,10 +1,14 @@
 import { Link } from "react-router-dom";
+import { Logo } from "./Logo";
 
 export function Footer() {
   return (
     <footer className="bg-navy dark:bg-[#0A1412] border-t border-white/10 dark:border-gray-800/80 relative z-20 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p className="text-xs text-white/40">© {new Date().getFullYear()} Servixo. All rights reserved.</p>
+        <div className="flex items-center gap-2.5">
+          <Logo className="w-6 h-6" />
+          <p className="text-xs text-white/40">© {new Date().getFullYear()} Servixo. All rights reserved.</p>
+        </div>
 
         <div className="flex items-center gap-5 text-xs text-white/60">
           <Link to="/terms" className="hover:text-accent transition">

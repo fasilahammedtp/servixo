@@ -9,6 +9,10 @@ import {
   getAdminUsers,
   blockUser,
   unblockUser,
+  getUserDetails,
+  getAdminCategories,
+  createAdminCategory,
+  updateAdminCategory,
 } from "../controllers/adminController";
 import { requireAuth } from "../middleware/auth";
 import { Request, Response, NextFunction } from "express";
@@ -33,7 +37,12 @@ router.patch("/workers/:workerId/verify", requireAuth, requireAdmin, verifyWorke
 router.patch("/workers/:workerId/reject", requireAuth, requireAdmin, rejectWorker);
 
 router.get("/users", requireAuth, requireAdmin, getAdminUsers);
+router.get("/users/:userId/details", requireAuth, requireAdmin, getUserDetails);
 router.patch("/users/:userId/block", requireAuth, requireAdmin, blockUser);
 router.patch("/users/:userId/unblock", requireAuth, requireAdmin, unblockUser);
+
+router.get("/categories", requireAuth, requireAdmin, getAdminCategories);
+router.post("/categories", requireAuth, requireAdmin, createAdminCategory);
+router.patch("/categories/:id", requireAuth, requireAdmin, updateAdminCategory);
 
 export default router;

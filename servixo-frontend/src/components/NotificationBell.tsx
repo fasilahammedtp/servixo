@@ -5,8 +5,10 @@ import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import { getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead } from "../services/notificationService";
 import { AppNotification } from "../types";
-import { Bell, Briefcase, DollarSign, CheckCircle2, Clock, Star, Truck, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Bell, Briefcase, DollarSign, CheckCircle2, Clock, Star, Truck, ShieldCheck, AlertTriangle, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+import { Badge } from "./Badge";
 
 function formatTimeAgo(dateString: string) {
   const date = new Date(dateString);
@@ -53,6 +55,7 @@ export function NotificationBell() {
         old.map((n) => (n._id === updatedNotif._id ? updatedNotif : n))
       );
       queryClient.invalidateQueries({ queryKey: ["unreadNotificationCount"] });
+      queryClient.invalidateQueries({ queryKey: ["badgeSummary"] });
     },
   });
 
@@ -62,6 +65,7 @@ export function NotificationBell() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["unreadNotificationCount"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["badgeSummary"] });
     },
   });
 
@@ -90,6 +94,7 @@ export function NotificationBell() {
       // Invalidate queries so count and dropdown list update automatically
       queryClient.invalidateQueries({ queryKey: ["unreadNotificationCount"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["badgeSummary"] });
     };
 
     socket.on("new-notification", handleNewNotification);
@@ -116,18 +121,29 @@ export function NotificationBell() {
     }
     setIsOpen(false);
 
+    if (notification.type === "new_message") {
+      navigate(user?.role === "worker" ? "/worker/messages" : "/home/messages");
+      return;
+    }
+
     if (notification.job) {
       const jobIdStr = typeof notification.job === "object" ? (notification.job as any)._id : notification.job;
       if (user?.role === "customer") {
         navigate(`/home/jobs/${jobIdStr}`);
       } else if (user?.role === "worker") {
-        navigate("/worker");
+        if (["quote_accepted", "payment_confirmed", "review_received"].includes(notification.type)) {
+          navigate("/worker/my-jobs");
+        } else {
+          navigate("/worker");
+        }
       }
     }
   };
 
   const getIcon = (type: string) => {
     switch (type) {
+      case "new_message":
+        return <MessageSquare className="w-4 h-4 text-rose-600 dark:text-rose-400" />;
       case "job_matched":
         return <Briefcase className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
       case "quote_received":
@@ -160,11 +176,12 @@ export function NotificationBell() {
         title="Notifications"
       >
         <Bell className="w-5 h-5" />
-        {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white font-extrabold text-[10px] rounded-full border-2 border-white dark:border-gray-900 animate-pulse">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
-        )}
+        <Badge
+          count={unreadCount}
+          variant="rose"
+          size="sm"
+          className="absolute top-1 right-1 border-2 border-white dark:border-[#101F1C]"
+        />
       </button>
 
       <AnimatePresence>
@@ -174,7 +191,7 @@ export function NotificationBell() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-[#142623] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700/80 py-2 z-50 overflow-hidden"
+            className="fixed inset-x-3 top-16 sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-[#142623] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700/80 py-2 z-50 overflow-hidden"
           >
             {/* Header */}
             <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700/50 flex items-center justify-between">

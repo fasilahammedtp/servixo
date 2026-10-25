@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    color-scheme: dark;
+  }
   body {
     font-family: "Inter", system-ui, sans-serif;
     @apply bg-[#FAF9F5] text-slate-900 dark:bg-[#0B1513] dark:text-white transition-colors duration-300 min-h-screen;

@@ -15,6 +15,7 @@ export interface IUser extends Document {
   isBlocked: boolean;
   otpCode?: string;
   otpExpires?: Date;
+  otpAttempts?: number;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
   isEmailVerified: boolean;
@@ -37,6 +38,7 @@ const userSchema = new Schema<IUser>(
     isBlocked: { type: Boolean, default: false },
     otpCode: { type: String, select: false },
     otpExpires: { type: Date, select: false },
+    otpAttempts: { type: Number, default: 0, select: false },
     resetPasswordToken: { type: String, select: false },
     resetPasswordExpires: { type: Date, select: false },
     isEmailVerified: { type: Boolean, default: false },

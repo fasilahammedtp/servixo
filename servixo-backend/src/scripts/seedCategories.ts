@@ -14,6 +14,7 @@ const categories = [
   { name: "Cleaning", icon: "sparkles" },
   { name: "AC Repair", icon: "wind" },
   { name: "Appliance Repair", icon: "settings" },
+  { name: "Other", icon: "more-horizontal" },
 ];
 
 async function seed() {

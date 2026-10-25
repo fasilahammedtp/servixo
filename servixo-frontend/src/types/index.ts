@@ -9,6 +9,8 @@ export interface User {
   profilePhoto?: string;
   hasWorkerProfile?: boolean;
   hasCustomerProfile?: boolean;
+  isEmailVerified?: boolean;
+  verificationStatus?: "pending" | "verified" | "rejected";
 }
 
 export interface AuthResponse {
@@ -23,6 +25,12 @@ export interface Category {
   name: string;
   icon: string;
   description?: string;
+  isActive?: boolean;
+  image?: string;
+  jobCount?: number;
+  workerCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Quotation {
@@ -47,7 +55,16 @@ export type NotificationType =
   | "payment_reminder"
   | "review_received"
   | "worker_verified"
-  | "worker_rejected";
+  | "worker_rejected"
+  | "new_message";
+
+export interface BadgeSummary {
+  messages: number;
+  bookings: number;
+  hiredJobs: number;
+  bookingJobIds: string[];
+  hiredJobIds: string[];
+}
 
 export interface AppNotification {
   _id: string;
@@ -58,4 +75,88 @@ export interface AppNotification {
   isRead: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ChatMessage {
+  _id: string;
+  job: string;
+  sender: string | { _id: string; name: string; profilePhoto?: string };
+  recipient: string;
+  text: string;
+  readAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Conversation {
+  jobId: string;
+  category: string;
+  otherParty: {
+    _id?: string;
+    name: string;
+    profilePhoto?: string;
+  };
+  otherPartyName: string;
+  otherPartyProfilePhoto?: string;
+  lastMessage: {
+    text: string;
+    time: string;
+  };
+  lastMessageText: string;
+  lastMessageTime: string;
+  unreadCount: number;
+}
+
+export type JobStatus =
+  | "pending"
+  | "accepted"
+  | "in_progress"
+  | "on_the_way"
+  | "arrived"
+  | "working"
+  | "completed"
+  | "cancelled";
+
+export interface Job {
+  _id: string;
+  customer: string | User;
+  worker?: {
+    _id: string;
+    user?: {
+      _id: string;
+      name: string;
+      profilePhoto?: string;
+    };
+    skills?: string[];
+    experienceYears?: number;
+    visitingCharge?: number;
+    rating?: number;
+    totalReviews?: number;
+  };
+  category: {
+    _id: string;
+    name: string;
+  } | string;
+  customTitle?: string;
+  description: string;
+  images: string[];
+  location?: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+  address?: string;
+  status: JobStatus;
+  finalPrice?: number;
+  isPaid: boolean;
+  paymentIssueReported?: boolean;
+  paymentIssueReportedAt?: string;
+  startedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+  quotesCount?: number;
+  lowestQuote?: number | null;
+  unreadMessages?: number;
+  review?: {
+    rating: number;
+  } | null;
 }

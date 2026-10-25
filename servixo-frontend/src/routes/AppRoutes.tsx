@@ -21,6 +21,7 @@ import BecomeWorker from "../pages/customer/BecomeWorker";
 import Admin from "../pages/admin/Admin";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 import { CustomerLayout } from "../components/CustomerLayout";
+import Messages from "../pages/shared/Messages";
 
 export default function AppRoutes() {
   return (
@@ -57,6 +58,7 @@ export default function AppRoutes() {
         <Route path="/home/jobs/:id" element={<JobDetail />} />
         <Route path="/home/history" element={<JobHistory />} />
         <Route path="/home/profile" element={<CustomerProfile />} />
+        <Route path="/home/messages" element={<Messages portal="customer" />} />
       </Route>
 
       <Route
@@ -72,6 +74,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["worker"]}>
             <WorkerMyJobs />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/worker/messages"
+        element={
+          <ProtectedRoute allowedRoles={["worker"]}>
+            <Messages portal="worker" />
           </ProtectedRoute>
         }
       />

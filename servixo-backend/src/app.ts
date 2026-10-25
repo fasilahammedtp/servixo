@@ -11,30 +11,33 @@ import uploadRoutes from "./routes/uploadRoutes";
 import quotationRoutes from "./routes/quotationRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
 import reviewRoutes from "./routes/reviewRoutes";
+import messageRoutes from "./routes/messageRoutes";
+import badgeRoutes from "./routes/badgeRoutes";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { isOriginAllowed } from "./config/cors";
+
 const app: Application = express();
+
+// Trust proxy for reverse proxy platforms like Render (must be set before rate limiters)
+app.set("trust proxy", 1);
 
 app.use(helmet());
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (
-        (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) ||
-        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
-      ) {
-        return callback(null, true);
-      }
-      return callback(null, true);
-    },
+    origin: isOriginAllowed,
     credentials: true,
   })
 );
 app.use(express.json());
 
+// Public health check endpoint for Render health monitoring (no auth, no DB call)
+app.get("/health", (req: Request, res: Response) => {
+  res.status(200).json({ ok: true });
+});
+
 app.get("/api/health", (req: Request, res: Response) => {
-  res.status(200).json({ status: "ok", message: "Servixo API is running" });
+  res.status(200).json({ ok: true, status: "ok", message: "Servixo API is running" });
 });
 
 const authLimiter = rateLimit({
@@ -51,10 +54,12 @@ app.use("/api/workers", workerRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/jobs", jobRoutes);
+app.use("/api/messages", messageRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/quotations", quotationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/badges", badgeRoutes);
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ message: "Route not found" });

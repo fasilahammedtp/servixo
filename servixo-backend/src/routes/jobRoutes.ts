@@ -12,6 +12,12 @@ import {
   markJobPaid,
   reportPaymentIssue,
 } from "../controllers/jobController";
+import {
+  sendMessage,
+  getJobMessages,
+  markJobMessagesAsRead,
+  messageRateLimiter,
+} from "../controllers/messageController";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { validate } from "../middleware/validate";
 import { createJobSchema } from "../validators/jobValidators";
@@ -29,6 +35,11 @@ router.patch("/:jobId/start", requireAuth, requireRole("worker"), startJob);
 router.patch("/:jobId/complete", requireAuth, requireRole("worker"), completeJob);
 router.patch("/:jobId/mark-paid", requireAuth, requireRole("customer"), markJobPaid);
 router.post("/:jobId/report-payment-issue", requireAuth, requireRole("worker"), reportPaymentIssue);
+
+// Messaging routes
+router.post("/:jobId/messages", requireAuth, messageRateLimiter, sendMessage);
+router.get("/:jobId/messages", requireAuth, getJobMessages);
+router.patch("/:jobId/messages/read", requireAuth, markJobMessagesAsRead);
 
 router.get("/:id", requireAuth, getJobById);
 

@@ -1,12 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getWorkerAssignedJobs, startJob, completeJob, reportPaymentIssue } from "../../services/jobService";
+import { markBadgesSeen } from "../../services/badgeService";
 import { useAuth } from "../../context/AuthContext";
 import { useSocket } from "../../context/SocketContext";
 import { NotificationBell } from "../../components/NotificationBell";
-import { ThemeToggle } from "../../components/ThemeToggle";
-import { LogoIcon } from "../../components/Logo";
+import { Logo } from "../../components/Logo";
+import { Badge } from "../../components/Badge";
+import { useBadgeSummary } from "../../hooks/useBadgeSummary";
 import { motion } from "framer-motion";
 import {
   Briefcase,
@@ -28,7 +30,11 @@ import {
   Play,
   CheckCircle,
   Flag,
+  MoreHorizontal,
+  MessageSquare,
 } from "lucide-react";
+import { formatJobCategory } from "../../utils/jobUtils";
+import { MessagesUnreadBadge } from "../../components/MessagesUnreadBadge";
 
 const getCategoryIcon = (name: string) => {
   const normalized = name ? name.toLowerCase() : "";
@@ -37,6 +43,7 @@ const getCategoryIcon = (name: string) => {
   if (normalized.includes("clean")) return <HomeIcon className="w-5 h-5" />;
   if (normalized.includes("paint")) return <Paintbrush className="w-5 h-5" />;
   if (normalized.includes("ac") || normalized.includes("repair")) return <Wrench className="w-5 h-5" />;
+  if (normalized.includes("other")) return <MoreHorizontal className="w-5 h-5" />;
   return <Briefcase className="w-5 h-5" />;
 };
 
@@ -45,6 +52,31 @@ export default function WorkerMyJobs() {
   const { user, logout } = useAuth();
   const { socket } = useSocket();
   const queryClient = useQueryClient();
+  const { data: badgeSummary } = useBadgeSummary();
+
+  const [unseenJobIds, setUnseenJobIds] = useState<Set<string>>(new Set());
+  const hasCapturedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasCapturedRef.current && badgeSummary?.hiredJobIds && badgeSummary.hiredJobIds.length > 0) {
+      setUnseenJobIds(new Set(badgeSummary.hiredJobIds));
+      hasCapturedRef.current = true;
+    }
+  }, [badgeSummary?.hiredJobIds]);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        await markBadgesSeen("hiredJobs");
+        queryClient.invalidateQueries({ queryKey: ["badgeSummary"] });
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      } catch (err) {
+        console.error("Failed to mark hiredJobs badges as seen:", err);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [queryClient]);
 
   const { data: jobs, isLoading, isError } = useQuery({
     queryKey: ["workerMyJobs"],
@@ -158,13 +190,13 @@ export default function WorkerMyJobs() {
   return (
     <div className="min-h-screen bg-[#FAF9F5] dark:bg-[#0B1513] font-sans selection:bg-accent/30 overflow-x-hidden transition-colors duration-300">
       {/* Header Bar */}
-      <header className="bg-[#FAF9F5]/90 dark:bg-[#101F1C]/90 backdrop-blur-md border-b border-[#EBE6DA] dark:border-gray-800/80 px-6 py-4 flex items-center justify-between shadow-xs sticky top-0 z-30 transition-colors duration-300">
-        <div className="flex items-center gap-6">
+      <header className="bg-[#FAF9F5]/90 dark:bg-[#101F1C]/90 backdrop-blur-md border-b border-[#EBE6DA] dark:border-gray-800/80 px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between shadow-xs sticky top-0 z-30 transition-colors duration-300">
+        <div className="flex items-center gap-3 sm:gap-6">
 
-          <div className="flex items-center gap-3">
-            <LogoIcon className="w-10 h-10 rounded-xl shadow-md" />
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <Logo className="w-9 h-9 sm:w-10 sm:h-10" />
             <div>
-              <h1 className="text-lg font-extrabold text-navy dark:text-white leading-none">Servixo</h1>
+              <h1 className="text-base sm:text-lg font-extrabold text-navy dark:text-white leading-none">Servixo</h1>
               <p className="text-[10px] text-accent font-bold uppercase tracking-wider mt-0.5">
                 Worker Portal
               </p>
@@ -180,9 +212,18 @@ export default function WorkerMyJobs() {
             </button>
             <button
               onClick={() => navigate("/worker/my-jobs")}
-              className="text-xs font-bold bg-navy/5 dark:bg-accent/20 text-navy dark:text-accent px-3 py-2 rounded-xl transition"
+              className="text-xs font-bold bg-navy/5 dark:bg-accent/20 text-navy dark:text-accent px-3 py-2 rounded-xl transition inline-flex items-center gap-1.5"
             >
-              My Hired Jobs
+              <span>My Hired Jobs</span>
+              <Badge count={badgeSummary?.hiredJobs} size="sm" />
+            </button>
+            <button
+              onClick={() => navigate("/worker/messages")}
+              className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-navy dark:hover:text-white px-3 py-2 rounded-xl transition flex items-center gap-1.5"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Messages</span>
+              <Badge count={badgeSummary?.messages} size="sm" />
             </button>
             <button
               onClick={() => navigate("/worker/profile")}
@@ -193,7 +234,7 @@ export default function WorkerMyJobs() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => navigate("/home")}
@@ -203,28 +244,57 @@ export default function WorkerMyJobs() {
             <HomeIcon className="w-3.5 h-3.5" /> Customer View
           </button>
           <NotificationBell />
-          <ThemeToggle />
           <button
             onClick={() => navigate("/worker/profile")}
-            className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700/60 border border-gray-200 dark:border-gray-700/80 rounded-full px-3 py-1.5 transition-all text-left group"
+            className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700/60 border border-gray-200 dark:border-gray-700/80 rounded-full px-2.5 sm:px-3 py-1.5 transition-all text-left group min-h-[38px]"
             title="Edit Profile"
           >
-            <div className="w-7 h-7 rounded-full bg-navy text-accent font-bold text-xs flex items-center justify-center shadow-sm overflow-hidden">
+            <div className="w-7 h-7 rounded-full bg-navy text-accent font-bold text-xs flex items-center justify-center shadow-sm overflow-hidden flex-shrink-0">
               {user?.profilePhoto ? (
                 <img src={user.profilePhoto} alt={user.name} className="w-full h-full object-cover" />
               ) : (
                 user?.name?.charAt(0) || "W"
               )}
             </div>
-            <span className="text-xs font-bold text-navy hidden sm:inline group-hover:text-accent transition-colors">
+            <span className="text-xs font-bold text-navy dark:text-slate-200 hidden sm:inline group-hover:text-accent transition-colors">
               {user?.name}
             </span>
           </button>
         </div>
       </header>
 
+      {/* Mobile Worker Navigation Bar */}
+      <div className="md:hidden flex items-center justify-around border-b border-[#EBE6DA] dark:border-gray-800 bg-white/80 dark:bg-[#101F1C]/90 backdrop-blur-md px-2 py-2 sticky top-[57px] z-20">
+        <button
+          onClick={() => navigate("/worker")}
+          className="text-xs font-semibold text-gray-500 dark:text-gray-400 py-1.5 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-h-[36px]"
+        >
+          Requests
+        </button>
+        <button
+          onClick={() => navigate("/worker/my-jobs")}
+          className="text-xs font-bold text-navy dark:text-accent py-1.5 px-3 rounded-lg bg-navy/5 dark:bg-accent/20 min-h-[36px] flex items-center gap-1.5"
+        >
+          <span>My Jobs</span>
+          <Badge count={badgeSummary?.hiredJobs} size="sm" />
+        </button>
+        <button
+          onClick={() => navigate("/worker/messages")}
+          className="text-xs font-semibold text-gray-500 dark:text-gray-400 py-1.5 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-h-[36px] flex items-center gap-1.5"
+        >
+          <span>Messages</span>
+          <Badge count={badgeSummary?.messages} size="sm" />
+        </button>
+        <button
+          onClick={() => navigate("/worker/profile")}
+          className="text-xs font-semibold text-gray-500 dark:text-gray-400 py-1.5 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-h-[36px]"
+        >
+          My Profile
+        </button>
+      </div>
+
       {/* Hero Banner */}
-      <div className="relative bg-gradient-to-br from-navy via-navy to-blue-950 py-10 px-6 overflow-hidden rounded-b-[2.5rem] shadow-xl">
+      <div className="relative bg-gradient-to-br from-navy via-navy to-blue-950 py-8 sm:py-10 px-4 sm:px-6 overflow-hidden rounded-b-3xl sm:rounded-b-[2.5rem] shadow-xl">
         <div className="absolute top-0 right-0 w-[24rem] h-[24rem] bg-accent/15 rounded-full blur-[80px] pointer-events-none" />
         <div className="max-w-5xl mx-auto relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
@@ -241,7 +311,7 @@ export default function WorkerMyJobs() {
 
           <button
             onClick={() => navigate("/worker")}
-            className="inline-flex items-center gap-2 text-xs font-bold bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-2xl border border-white/20 backdrop-blur-md transition-all shadow-sm"
+            className="inline-flex items-center gap-2 text-xs font-bold bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-2xl border border-white/20 backdrop-blur-md transition-all shadow-sm min-h-[40px]"
           >
             <ArrowLeft className="w-4 h-4" /> Available Requests
           </button>
@@ -292,7 +362,7 @@ export default function WorkerMyJobs() {
             </div>
 
             {jobs.map((job: any, index: number) => {
-              const categoryName = job.category?.name || "Service Request";
+              const categoryName = formatJobCategory(job);
               const customer = job.customer;
               const customerName = customer?.name || "Customer";
               const customerPhoto = customer?.profilePhoto;
@@ -303,7 +373,7 @@ export default function WorkerMyJobs() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
                   key={job._id}
-                  className="bg-white dark:bg-[#132320] border border-gray-100 dark:border-gray-800 rounded-[2rem] p-6 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] hover:shadow-lg transition-all duration-300 relative overflow-hidden"
+                  className="bg-white dark:bg-[#132320] border border-gray-100 dark:border-gray-800 rounded-2xl sm:rounded-[2rem] p-4 sm:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] hover:shadow-lg transition-all duration-300 relative overflow-hidden"
                 >
                   {/* Top Bar: Category & Status */}
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-4 border-b border-gray-100 dark:border-gray-800">
@@ -312,6 +382,12 @@ export default function WorkerMyJobs() {
                         {getCategoryIcon(categoryName)}
                         {categoryName}
                       </span>
+                      {unseenJobIds.has(job._id) && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          New
+                        </span>
+                      )}
                       <span className="text-xs text-gray-400 dark:text-gray-400 font-semibold flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5 text-gray-400" />
                         {new Date(job.createdAt).toLocaleDateString(undefined, {
@@ -385,11 +461,19 @@ export default function WorkerMyJobs() {
                       </div>
 
                       <div className="pt-3 border-t border-navy/10 dark:border-gray-700 space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/worker/messages?jobId=${job._id}`)}
+                          className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-gray-700/80 dark:hover:bg-gray-700 text-navy dark:text-white font-extrabold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all border border-slate-200 dark:border-gray-600 min-h-[40px] cursor-pointer"
+                        >
+                          <MessageSquare className="w-4 h-4 text-accent" /> Message Customer
+                        </button>
+
                         {job.status === "accepted" && (
                           <button
                             onClick={() => startMutation.mutate(job._id)}
                             disabled={startMutation.isPending}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50 min-h-[42px]"
                           >
                             {startMutation.isPending && startMutation.variables === job._id ? (
                               <>
@@ -407,7 +491,7 @@ export default function WorkerMyJobs() {
                           <button
                             onClick={() => completeMutation.mutate(job._id)}
                             disabled={completeMutation.isPending}
-                            className="w-full bg-accent hover:bg-blue-600 text-white font-extrabold px-4 py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50"
+                            className="w-full bg-accent hover:bg-blue-600 text-white font-extrabold px-4 py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50 min-h-[42px]"
                           >
                             {completeMutation.isPending && completeMutation.variables === job._id ? (
                               <>

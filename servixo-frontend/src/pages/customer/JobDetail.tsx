@@ -6,6 +6,7 @@ import { getJobQuotations, acceptQuotation } from "../../services/quotationServi
 import { createReview, getJobReview } from "../../services/reviewService";
 import { useSocket } from "../../context/SocketContext";
 import { Navbar } from "../../components/Navbar";
+import { formatJobCategory } from "../../utils/jobUtils";
 import {
   ChevronLeft,
   MapPin,
@@ -42,6 +43,19 @@ export default function JobDetail() {
     queryFn: () => getJobById(id!),
     enabled: !!id,
   });
+
+  useEffect(() => {
+    if (window.location.hash && job) {
+      const targetId = window.location.hash.replace("#", "");
+      const timer = setTimeout(() => {
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [job]);
 
   useEffect(() => {
     if (!socket || !id) return;
@@ -141,44 +155,44 @@ export default function JobDetail() {
     switch (status) {
       case "pending":
         return (
-          <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-max">
+          <span className="bg-yellow-100 dark:bg-yellow-950/40 text-yellow-800 dark:text-yellow-300 border border-transparent dark:border-yellow-800/40 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-max">
             <Clock className="w-3 h-3" /> Pending
           </span>
         );
       case "accepted":
         return (
-          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-max">
+          <span className="bg-blue-100 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border border-transparent dark:border-blue-800/40 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-max">
             <CheckCircle className="w-3 h-3" /> Accepted & Assigned
           </span>
         );
       case "in_progress":
         return (
-          <span className="bg-amber-100 text-amber-900 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 w-max border border-amber-200">
+          <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 w-max border border-amber-200 dark:border-amber-800/40">
             <span className="w-2 h-2 rounded-full bg-amber-600 animate-ping" /> In Progress
           </span>
         );
       case "completed":
         if (isPaid) {
           return (
-            <span className="bg-emerald-100 text-emerald-800 px-3.5 py-1 rounded-full text-xs font-extrabold flex items-center gap-1 w-max border border-emerald-300">
+            <span className="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 px-3.5 py-1 rounded-full text-xs font-extrabold flex items-center gap-1 w-max border border-emerald-300 dark:border-emerald-800/40">
               <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Completed & Paid
             </span>
           );
         }
         return (
-          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-max">
+          <span className="bg-green-100 dark:bg-emerald-950/40 text-green-800 dark:text-emerald-300 border border-transparent dark:border-emerald-800/40 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-max">
             <CheckCircle className="w-3 h-3" /> Completed
           </span>
         );
       case "cancelled":
         return (
-          <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-max">
+          <span className="bg-red-100 dark:bg-rose-950/40 text-red-800 dark:text-rose-300 border border-transparent dark:border-rose-800/40 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-max">
             <XCircle className="w-3 h-3" /> Cancelled
           </span>
         );
       default:
         return (
-          <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-max">
+          <span className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border border-transparent dark:border-gray-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-max">
             {status}
           </span>
         );
@@ -243,13 +257,13 @@ export default function JobDetail() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="bg-white dark:bg-[#132320]/95 rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-2xl border border-[#EBE6DA] dark:border-gray-800 p-6 sm:p-10 relative overflow-hidden"
+          className="bg-white dark:bg-[#132320]/95 rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-2xl border border-[#EBE6DA] dark:border-gray-800 p-4 sm:p-10 relative overflow-hidden"
         >
 
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
             <div>
               <h1 className="text-3xl font-extrabold text-navy dark:text-white mb-3">
-                {job.category?.name || "Service Request"}
+                {formatJobCategory(job)}
               </h1>
               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-300 font-medium">
                 <div className="flex items-center gap-1.5">
@@ -338,10 +352,17 @@ export default function JobDetail() {
                     </div>
                   </div>
 
-                  <div className="w-full sm:w-auto flex flex-col items-end gap-2">
+                  <div className="w-full sm:w-auto flex flex-col sm:items-end gap-2.5">
                     <span className="bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-extrabold px-3.5 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Professional Hired
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/home/messages?jobId=${job._id}`)}
+                      className="inline-flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 dark:bg-accent dark:hover:bg-amber-400 text-white dark:text-navy text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-xs transition cursor-pointer min-h-[38px] w-full sm:w-auto"
+                    >
+                      <MessageSquare className="w-4 h-4" /> Message Professional
+                    </button>
                     <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
                       Worker will arrive at your specified location.
                     </p>
@@ -355,7 +376,7 @@ export default function JobDetail() {
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-emerald-500/10 dark:from-amber-950/30 dark:to-emerald-950/30 border-2 border-amber-400/60 dark:border-amber-500/50 rounded-2xl p-6 sm:p-7 shadow-lg relative overflow-hidden"
+                className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-emerald-500/10 dark:from-amber-950/30 dark:to-emerald-950/30 border-2 border-amber-400/60 dark:border-amber-500/50 rounded-2xl p-4 sm:p-7 shadow-lg relative overflow-hidden"
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
                   <div className="flex items-start gap-4">
@@ -398,7 +419,8 @@ export default function JobDetail() {
               <div className="pt-2">
                 {!job.isPaid ? (
                   <div
-                    className={`rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm ${
+                    id="payment"
+                    className={`rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm scroll-mt-24 ${
                       job.paymentIssueReported
                         ? "bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100/50 dark:from-amber-950/40 dark:to-orange-950/30 border border-amber-300 dark:border-amber-700/70"
                         : "bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200 dark:border-emerald-800/60"
@@ -474,6 +496,7 @@ export default function JobDetail() {
                     </div>
 
                     {/* Rate & Review Section */}
+                    <div id="review" className="scroll-mt-24">
                     {loadingReview ? (
                       <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 text-center animate-pulse">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400 mb-2" />
@@ -552,12 +575,12 @@ export default function JobDetail() {
                                     className={`w-8 h-8 ${
                                       star <= (hoverRating || ratingInput)
                                         ? "fill-amber-400 text-amber-400"
-                                        : "text-gray-300"
+                                        : "text-gray-300 dark:text-gray-600"
                                     }`}
                                   />
                                 </button>
                               ))}
-                              <span className="ml-3 text-sm font-extrabold text-navy dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 text-amber-800 px-3 py-1 rounded-lg border border-amber-200 dark:border-amber-900/50">
+                              <span className="ml-3 text-sm font-extrabold bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-3 py-1 rounded-lg border border-amber-200 dark:border-amber-900/50">
                                 {hoverRating || ratingInput} / 5 Stars
                               </span>
                             </div>
@@ -577,7 +600,7 @@ export default function JobDetail() {
                           </div>
 
                           {reviewMutation.isError && (
-                            <p className="text-xs font-bold text-red-600 bg-red-50 p-3 rounded-xl border border-red-200">
+                            <p className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 p-3 rounded-xl border border-red-200 dark:border-red-800/50">
                               {(reviewMutation.error as any)?.response?.data?.message || "Failed to submit review."}
                             </p>
                           )}
@@ -600,13 +623,14 @@ export default function JobDetail() {
                         </form>
                       </div>
                     )}
+                    </div>
                   </div>
                 )}
               </div>
             )}
 
             {job.status === "pending" && !job.worker && (
-              <div>
+              <div id="quotations" className="scroll-mt-24">
                 <div className="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-gray-800 pb-3">
                   <h3 className="text-lg font-bold text-navy dark:text-white flex items-center gap-2">
                     Received Quotations
@@ -656,11 +680,11 @@ export default function JobDetail() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             key={q._id}
-                            className="bg-gray-50/80 dark:bg-gray-800/60 hover:bg-white dark:hover:bg-gray-800 border border-gray-200/80 dark:border-gray-700 hover:border-accent/40 rounded-2xl p-5 sm:p-6 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6"
+                            className="bg-gray-50/80 dark:bg-gray-800/60 hover:bg-white dark:hover:bg-gray-800 border border-gray-200/80 dark:border-gray-700 hover:border-accent/40 rounded-2xl p-4 sm:p-6 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6"
                           >
 
-                            <div className="flex items-start gap-4">
-                              <div className="w-14 h-14 bg-navy dark:bg-gray-700 rounded-2xl overflow-hidden flex-shrink-0 border border-gray-200 dark:border-gray-600 shadow-sm">
+                            <div className="flex items-start gap-3 sm:gap-4">
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-navy dark:bg-gray-700 rounded-2xl overflow-hidden flex-shrink-0 border border-gray-200 dark:border-gray-600 shadow-sm">
                                 {workerUser.profilePhoto ? (
                                   <img
                                     src={workerUser.profilePhoto}
@@ -675,8 +699,8 @@ export default function JobDetail() {
                               </div>
 
                               <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-extrabold text-navy dark:text-white text-lg">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <h4 className="font-extrabold text-navy dark:text-white text-base sm:text-lg">
                                     {workerUser.name || "Worker Partner"}
                                   </h4>
                                   <span className="flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/50">
@@ -722,7 +746,7 @@ export default function JobDetail() {
                               <button
                                 onClick={() => acceptMutation.mutate(q._id)}
                                 disabled={acceptMutation.isPending}
-                                className="bg-navy hover:bg-accent dark:bg-accent dark:hover:bg-amber-400 text-white dark:text-navy px-6 py-2.5 rounded-xl font-extrabold text-sm flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50"
+                                className="bg-navy hover:bg-accent dark:bg-accent dark:hover:bg-amber-400 text-white dark:text-navy px-5 sm:px-6 py-2.5 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 min-h-[42px]"
                               >
                                 {acceptMutation.isPending && acceptMutation.variables === q._id ? (
                                   <>

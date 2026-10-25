@@ -28,6 +28,7 @@ export default function CreateRequest() {
   const initialDescription = state?.description || "";
 
   const [category, setCategory] = useState(initialCategory);
+  const [customTitle, setCustomTitle] = useState("");
   const [description, setDescription] = useState(initialDescription);
   const [images, setImages] = useState<{file: File, previewUrl: string}[]>([]);
   const [locationData, setLocationData] = useState<{ lat: number; lng: number } | null>(null);
@@ -102,6 +103,20 @@ export default function CreateRequest() {
       setErrorMessage("Please select a category");
       return;
     }
+
+    const isOther = category.trim().toLowerCase() === "other";
+    if (isOther) {
+      const trimmedTitle = customTitle.trim();
+      if (!trimmedTitle || trimmedTitle.length < 3) {
+        setErrorMessage("Please enter what service you need (at least 3 characters)");
+        return;
+      }
+      if (trimmedTitle.length > 60) {
+        setErrorMessage("Service title must not exceed 60 characters");
+        return;
+      }
+    }
+
     if (description.length < 10) {
       setErrorMessage("Description must be at least 10 characters");
       return;
@@ -125,6 +140,7 @@ export default function CreateRequest() {
 
     mutation.mutate({
       category,
+      customTitle: isOther ? customTitle.trim() : undefined,
       description,
       images: uploadedUrls,
       location: locationData || { lat: 0, lng: 0 },
@@ -132,6 +148,20 @@ export default function CreateRequest() {
   };
 
   if (mutation.isSuccess) {
+    const nearbyCount = (mutation.data as any)?.nearbyWorkersFound ?? 0;
+    const isOther = category.trim().toLowerCase() === "other";
+    const displayCategory = isOther && customTitle.trim() ? `Other: ${customTitle.trim()}` : category;
+
+    const handlePostAnother = () => {
+      mutation.reset();
+      setCategory("");
+      setCustomTitle("");
+      setDescription("");
+      setImages([]);
+      setErrorMessage("");
+      setUploadError("");
+    };
+
     return (
       <div className="min-h-screen bg-[#FAF9F5] dark:bg-[#0B1513] overflow-x-hidden font-sans relative flex flex-col transition-colors duration-300">
         <Navbar />
@@ -146,10 +176,10 @@ export default function CreateRequest() {
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             transition={{ type: "spring", bounce: 0.3, duration: 0.6 }}
-            className="w-full max-w-lg bg-white dark:bg-[#132320]/95 p-8 sm:p-12 rounded-[2.5rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#EBE6DA] dark:border-gray-800 relative overflow-hidden text-center"
+            className="w-full max-w-lg bg-white dark:bg-[#132320]/95 p-5 sm:p-12 rounded-[2.5rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#EBE6DA] dark:border-gray-800 relative overflow-hidden text-center"
           >
             <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-green-400/10 to-transparent rounded-bl-full pointer-events-none" />
-            <div className="relative mx-auto w-56 h-56 mb-4">
+            <div className="relative mx-auto w-44 h-44 sm:w-56 sm:h-56 mb-4">
               <motion.div
                 animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
@@ -180,18 +210,34 @@ export default function CreateRequest() {
               transition={{ delay: 0.5 }}
               className="text-gray-500 dark:text-gray-300 mb-8 text-base leading-relaxed max-w-sm mx-auto relative z-10"
             >
-              Your work for <span className="font-bold text-navy dark:text-white">{category}</span> will be in expert hands soon! Nearby professionals have been alerted and will respond shortly.
+              {nearbyCount > 0 ? (
+                <>
+                  Your work for <span className="font-bold text-navy dark:text-white">{displayCategory}</span> will be in expert hands soon! Nearby professionals have been alerted and will respond shortly.
+                </>
+              ) : (
+                <>
+                  Your work for <span className="font-bold text-navy dark:text-white">{displayCategory}</span> has been posted. No professionals matched yet, and your request stays open so available specialists can respond.
+                </>
+              )}
             </motion.p>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
-              className="relative z-10"
+              className="relative z-10 flex flex-col sm:flex-row items-center justify-center gap-3"
             >
               <button
+                type="button"
+                onClick={handlePostAnother}
+                className="bg-accent hover:bg-emerald-600 text-white font-bold px-6 py-3.5 rounded-xl text-base transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 w-full sm:w-auto"
+              >
+                Post another request
+              </button>
+              <button
+                type="button"
                 onClick={() => navigate("/home")}
-                className="bg-navy hover:bg-accent text-white px-10 py-3.5 rounded-xl font-bold text-base transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 w-full sm:w-auto"
+                className="bg-navy hover:bg-slate-800 text-white px-8 py-3.5 rounded-xl font-bold text-base transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 w-full sm:w-auto"
               >
                 Back to Dashboard
               </button>
@@ -224,11 +270,11 @@ export default function CreateRequest() {
           Back
         </motion.button>
 
-        <motion.div
+          <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="bg-white dark:bg-[#132320]/95 backdrop-blur-3xl rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-2xl border border-[#EBE6DA] dark:border-gray-800 p-6 sm:p-8 relative overflow-hidden"
+          className="bg-white dark:bg-[#132320]/95 backdrop-blur-3xl rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-2xl border border-[#EBE6DA] dark:border-gray-800 p-4 sm:p-8 relative overflow-hidden"
         >
 
 
@@ -242,8 +288,8 @@ export default function CreateRequest() {
           </div>
 
           {errorMessage && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl relative z-10">
-              <p className="text-red-600 text-sm font-semibold text-center sm:text-left">{errorMessage}</p>
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/50 rounded-xl relative z-10">
+              <p className="text-red-600 dark:text-red-400 text-sm font-semibold text-center sm:text-left">{errorMessage}</p>
             </div>
           )}
 
@@ -259,7 +305,7 @@ export default function CreateRequest() {
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                       required
-                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 text-navy dark:text-white text-base rounded-xl focus:ring-2 focus:ring-accent/20 focus:border-accent block px-4 py-3 outline-none transition-all shadow-sm appearance-none font-medium"
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 text-navy dark:text-white text-base rounded-xl focus:ring-2 focus:ring-accent/20 focus:border-accent block px-4 py-3 outline-none transition-all shadow-sm appearance-none font-medium min-h-[44px]"
                     >
                       <option value="" disabled className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">Select a category</option>
                       {categories?.map((cat) => (
@@ -277,6 +323,31 @@ export default function CreateRequest() {
                 )}
               </div>
 
+              {category.trim().toLowerCase() === "other" && (
+                <div className="space-y-2 md:col-span-2">
+                  <label className="block text-xs font-bold text-navy dark:text-white uppercase tracking-wider">
+                    What service do you need? <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={customTitle}
+                      onChange={(e) => setCustomTitle(e.target.value)}
+                      required
+                      minLength={3}
+                      maxLength={60}
+                      placeholder="e.g. Solar panel installation, EV charger setup..."
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 text-navy dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-base rounded-xl focus:ring-2 focus:ring-accent/20 focus:border-accent block px-4 py-3 outline-none transition-all shadow-sm font-medium pr-24 min-h-[44px]"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 dark:bg-gray-700/90 backdrop-blur px-2 py-1 rounded-md border border-gray-100 dark:border-gray-600 shadow-sm pointer-events-none">
+                      <p className={`text-[10px] font-bold tracking-wide ${customTitle.trim().length < 3 || customTitle.trim().length > 60 ? 'text-amber-500' : 'text-green-600'}`}>
+                        {customTitle.length}/60 chars
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2 md:col-span-2">
                 <label className="block text-xs font-bold text-navy dark:text-white uppercase tracking-wider">Detailed Description</label>
                 <div className="relative">
@@ -289,7 +360,7 @@ export default function CreateRequest() {
                     placeholder="E.g., I need a plumber to fix a leaking pipe under the kitchen sink..."
                     className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 text-navy dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-base rounded-xl focus:ring-2 focus:ring-accent/20 focus:border-accent block px-4 py-3 outline-none transition-all shadow-sm resize-none font-medium"
                   />
-                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-md border border-gray-100 shadow-sm">
+                  <div className="absolute bottom-3 right-3 bg-white/90 dark:bg-gray-700/90 backdrop-blur px-2 py-1 rounded-md border border-gray-100 dark:border-gray-600 shadow-sm">
                     <p className={`text-[10px] font-bold tracking-wide ${description.length < 10 ? 'text-red-500' : 'text-green-600'}`}>
                       {description.length}/500 chars
                     </p>
@@ -359,7 +430,7 @@ export default function CreateRequest() {
                       {locationData ? (
                         <p className="text-xs text-green-600 font-medium mt-0.5 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Location captured</p>
                       ) : (
-                        <p className="text-xs text-gray-500 mt-0.5">We need your coordinates to match nearby pros.</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">We need your coordinates to match nearby pros.</p>
                       )}
                     </div>
                   </div>
@@ -368,10 +439,10 @@ export default function CreateRequest() {
                     type="button"
                     onClick={getLocation}
                     disabled={locationLoading || !!locationData}
-                    className={`whitespace-nowrap px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+                    className={`whitespace-nowrap px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm w-full sm:w-auto min-h-[44px] flex items-center justify-center ${
                       locationData
-                      ? 'bg-green-50 text-green-700 border border-green-200 shadow-none'
-                      : 'bg-white text-navy border border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      ? 'bg-green-50 text-green-700 border border-green-200 shadow-none dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/50'
+                      : 'bg-white text-navy border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-white dark:border-gray-700 dark:hover:bg-gray-700'
                     }`}
                   >
                     {locationLoading ? (
@@ -387,11 +458,18 @@ export default function CreateRequest() {
               </div>
             </div>
 
-            <div className="pt-6 relative z-10 border-t border-gray-100 mt-8">
+            <div className="pt-6 relative z-10 border-t border-gray-100 dark:border-gray-800 mt-8">
               <button
                 type="submit"
-                disabled={mutation.isPending || isUploading || !category || description.length < 10}
-                className="w-full bg-navy hover:bg-accent disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold rounded-xl text-lg py-4 text-center transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 group"
+                disabled={
+                  mutation.isPending ||
+                  isUploading ||
+                  !category ||
+                  (category.trim().toLowerCase() === "other" &&
+                    (customTitle.trim().length < 3 || customTitle.trim().length > 60)) ||
+                  description.length < 10
+                }
+                className="w-full bg-navy hover:bg-accent disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-800 dark:disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-xl text-lg py-4 text-center transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 group"
               >
                 {mutation.isPending || isUploading ? (
                   <>

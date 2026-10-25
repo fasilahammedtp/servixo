@@ -2,6 +2,7 @@ import { useState, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../../services/api";
+import { Logo } from "../../components/Logo";
 
 export default function ResetPassword() {
     const navigate = useNavigate();
@@ -43,19 +44,22 @@ export default function ResetPassword() {
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#FAF9F5] dark:bg-[#0B1513] px-4 transition-colors duration-300">
             <div className="w-full max-w-sm bg-white dark:bg-[#132320] rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#EBE6DA] dark:border-gray-800 p-8">
+                <div className="flex justify-center mb-3">
+                    <Logo className="w-12 h-12" />
+                </div>
                 <h1 className="text-2xl font-semibold text-navy dark:text-white text-center mb-1">Set a new password</h1>
-                <p className="text-gray-500 text-center text-sm mb-6">
+                <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-6">
                     Choose a new password for your account
                 </p>
 
                 {errorMessage && (
-                    <div className="bg-red-50 text-red-600 text-sm rounded-lg px-3 py-2 mb-4">
+                    <div className="bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-transparent dark:border-red-800/50 text-sm rounded-lg px-3 py-2 mb-4">
                         {errorMessage}
                     </div>
                 )}
 
                 {!token && (
-                    <div className="bg-amber-50 text-amber-700 text-sm rounded-lg px-3 py-2 mb-4">
+                    <div className="bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-transparent dark:border-amber-800/50 text-sm rounded-lg px-3 py-2 mb-4">
                         No reset token found in this link. Please use the link from your email, or{" "}
                         <Link to="/forgot-password" className="underline font-medium">
                             request a new one
@@ -98,7 +102,7 @@ export default function ResetPassword() {
                     </button>
                 </form>
 
-                <p className="text-center text-sm text-gray-500 mt-6">
+                <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
                     <Link to="/login" className="text-accent font-medium hover:underline">
                         Back to login
                     </Link>

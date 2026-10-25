@@ -27,16 +27,17 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const socketUrl = import.meta.env.VITE_API_URL
-      ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, "")
-      : "http://localhost:5000";
+    // Socket.IO URL comes from VITE_API_URL only, stripping trailing /api
+    const rawApiUrl = import.meta.env.VITE_API_URL || "";
+    const socketUrl = rawApiUrl.replace(/\/api\/?$/, "");
 
     const newSocket: Socket = io(socketUrl, {
       auth: { token },
       transports: ["polling", "websocket"],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
     });
 
     newSocket.on("connect", () => {

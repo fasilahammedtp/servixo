@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getCategories } from "../../services/categoryService";
 import { getMyJobs, getCustomerDashboardStats } from "../../services/jobService";
 import { Navbar } from "../../components/Navbar";
+import { formatJobCategory } from "../../utils/jobUtils";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -20,32 +21,11 @@ import {
   Search as SearchIcon,
   MessageSquare,
   CheckCircle2,
-  DollarSign
+  DollarSign,
+  MoreHorizontal
 } from "lucide-react";
-
-const getCategoryIcon = (name: string) => {
-  const normalized = name.toLowerCase();
-  if (normalized.includes("plumb")) return <Droplets className="w-6 h-6" />;
-  if (normalized.includes("electri")) return <Zap className="w-6 h-6" />;
-  if (normalized.includes("clean")) return <HomeIcon className="w-6 h-6" />;
-  if (normalized.includes("paint")) return <Paintbrush className="w-6 h-6" />;
-  if (normalized.includes("ac") || normalized.includes("repair")) return <Wrench className="w-6 h-6" />;
-  return <Briefcase className="w-6 h-6" />;
-};
-
-const getCategoryImage = (name: string) => {
-  const normalized = name.toLowerCase();
-
-  if (normalized.includes("plumb")) return "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?q=80&w=800&auto=format&fit=crop";
-  if (normalized.includes("electri")) return "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=800&auto=format&fit=crop";
-  if (normalized.includes("clean")) return "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=800&auto=format&fit=crop";
-  if (normalized.includes("paint")) return "https://images.unsplash.com/photo-1734475318787-b2b737296469?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTF8fHBhaW50ZXJ8ZW58MHx8MHx8fDA%3D";
-  if (normalized.includes("ac")) return "https://plus.unsplash.com/premium_photo-1683134512538-7b390d0adc9e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8YWMlMjByZXBhaXJ8ZW58MHx8MHx8fDA%3D";
-  if (normalized.includes("appliance")) return "https://plus.unsplash.com/premium_photo-1661342406124-740ae7a0dd0e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8YXBwbGlhbmNlJTIwcmVwYWlyfGVufDB8fDB8fHww";
-  if (normalized.includes("carpent")) return "https://images.unsplash.com/photo-1544164560-adac3045edb2?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Y2FycGVudGVyfGVufDB8fDB8fHww";
-  if (normalized.includes("repair")) return "https://plus.unsplash.com/premium_photo-1661342406124-740ae7a0dd0e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8YXBwbGlhbmNlJTIwcmVwYWlyfGVufDB8fDB8fHww";
-  return "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=800&auto=format&fit=crop";
-};
+import { getCategoryIcon, resolveCategoryPhoto } from "../../utils/categoryTheme";
+import { MessagesUnreadBadge } from "../../components/MessagesUnreadBadge";
 
 export default function CustomerHome() {
   const { data: categories, isLoading: loadingCats } = useQuery({
@@ -129,13 +109,13 @@ export default function CustomerHome() {
           >
             Premium Service Marketplace
           </motion.span>
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold text-slate-900 dark:text-white mb-6 tracking-tight leading-[1.1]">
+          <h1 className="text-3xl sm:text-5xl md:text-7xl font-extrabold text-slate-900 dark:text-white mb-6 tracking-tight leading-[1.1]">
             Exceptional Services, <br className="hidden sm:block" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-800 via-teal-700 to-blue-800 dark:from-accent dark:to-blue-400">
               Delivered to You.
             </span>
           </h1>
-          <p className="text-lg sm:text-xl text-slate-600 dark:text-gray-300 mb-12 max-w-2xl mx-auto font-medium leading-relaxed">
+          <p className="text-base sm:text-xl text-slate-600 dark:text-gray-300 mb-8 sm:mb-12 max-w-2xl mx-auto font-medium leading-relaxed">
             Experience the finest local professionals. Fast, reliable, and just a click away. Book with confidence.
           </p>
 
@@ -146,9 +126,9 @@ export default function CustomerHome() {
             className="relative max-w-2xl mx-auto group z-20"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-amber-400/20 to-blue-500/20 dark:from-accent/30 dark:to-blue-500/30 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-60"></div>
-            <div className="relative flex items-center bg-white dark:bg-[#142623]/90 backdrop-blur-2xl border border-[#E5DEC9] dark:border-gray-700/80 p-2.5 rounded-full shadow-[0_12px_45px_rgba(60,50,20,0.08)] transition-all duration-400 group-hover:shadow-[0_20px_60px_rgba(60,50,20,0.14)] group-hover:-translate-y-1">
-              <div className="pl-6">
-                <Search className="h-6 w-6 text-gray-400 group-focus-within:text-emerald-700 dark:group-focus-within:text-accent transition-colors duration-300" />
+            <div className="relative flex items-center bg-white dark:bg-[#142623]/90 backdrop-blur-2xl border border-[#E5DEC9] dark:border-gray-700/80 p-1.5 sm:p-2.5 rounded-full shadow-[0_12px_45px_rgba(60,50,20,0.08)] transition-all duration-400 group-hover:shadow-[0_20px_60px_rgba(60,50,20,0.14)] group-hover:-translate-y-1">
+              <div className="pl-3 sm:pl-6">
+                <Search className="h-5 sm:h-6 w-5 sm:w-6 text-gray-400 group-focus-within:text-emerald-700 dark:group-focus-within:text-accent transition-colors duration-300" />
               </div>
               <input
                 type="text"
@@ -159,13 +139,13 @@ export default function CustomerHome() {
                     handleSearchSubmit();
                   }
                 }}
-                className="block w-full pl-4 pr-4 py-4 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white font-medium placeholder-gray-400 sm:text-lg outline-none"
+                className="block w-full pl-2 sm:pl-4 pr-2 sm:pr-4 py-2.5 sm:py-4 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white font-medium placeholder-gray-400 text-sm sm:text-lg outline-none"
                 placeholder="Search for a service..."
               />
               <button
                 type="button"
                 onClick={handleSearchSubmit}
-                className="bg-emerald-700 hover:bg-emerald-800 dark:bg-accent dark:hover:bg-amber-400 text-white dark:text-navy px-8 py-4 rounded-full text-base font-bold transition-all duration-300 shadow-md cursor-pointer"
+                className="bg-emerald-700 hover:bg-emerald-800 dark:bg-accent dark:hover:bg-amber-400 text-white dark:text-navy px-4 sm:px-8 py-2.5 sm:py-4 rounded-full text-sm sm:text-base font-bold transition-all duration-300 shadow-md cursor-pointer shrink-0"
               >
                 Explore
               </button>
@@ -188,7 +168,7 @@ export default function CustomerHome() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             {/* Total Bookings */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -304,44 +284,58 @@ export default function CustomerHome() {
               </div>
 
               {loadingCats ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
                   {[1, 2, 3, 4, 5, 6].map(i => (
                     <div key={i} className="h-56 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm animate-pulse rounded-3xl border border-white dark:border-gray-700"></div>
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6" style={{ perspective: 1200 }}>
-                  {categories?.map((category: any, i: number) => (
-                    <motion.button
-                      initial={{ opacity: 0, y: 40 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, margin: "-50px" }}
-                      whileHover={{ scale: 1.03, rotateX: 5, rotateY: -5, zIndex: 10 }}
-                      transition={{
-                        opacity: { delay: i * 0.1 },
-                        y: { delay: i * 0.1 },
-                        type: "spring", stiffness: 300, damping: 20
-                      }}
-                      key={category._id}
-                      onClick={() => navigate("/home/create-request", { state: { categoryName: category.name } })}
-                      className="relative h-56 rounded-[2rem] text-left overflow-hidden group shadow-[0_6px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.12)] transition-all duration-500 border border-[#EBE6DA] dark:border-gray-700/50 bg-white dark:bg-[#132320]"
-                    >
-                      <img
-                        src={getCategoryImage(category.name)}
-                        alt={category.name}
-                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out z-0"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent dark:from-navy/95 dark:via-navy/40 dark:to-transparent z-10 transition-opacity duration-500 group-hover:opacity-80"></div>
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6" style={{ perspective: 1200 }}>
+                    {categories?.map((category: any, i: number) => {
+                      const { imageUrl: catImage } = resolveCategoryPhoto(category);
+                      const isOther = category.name.toLowerCase() === "other";
 
-                      <div className="absolute inset-0 p-6 flex flex-col justify-end z-20">
-                        <div className="w-12 h-12 mb-4 rounded-2xl bg-white/15 dark:bg-white/10 backdrop-blur-xl flex items-center justify-center text-white border border-white/20 shadow-lg group-hover:bg-emerald-700 dark:group-hover:bg-accent group-hover:border-emerald-700 dark:group-hover:border-accent group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-500">
-                          {getCategoryIcon(category.name)}
-                        </div>
-                        <h3 className="font-bold text-white text-xl tracking-wide group-hover:text-emerald-300 dark:group-hover:text-accent-light transition-colors">{category.name}</h3>
-                        <p className="text-sm text-gray-200 dark:text-gray-300 mt-1.5 line-clamp-1 font-medium opacity-90 group-hover:opacity-100 transition-opacity">{category.description || 'Premium service'}</p>
-                      </div>
-                    </motion.button>
-                  ))}
+                      return (
+                        <motion.button
+                          initial={{ opacity: 0, y: 40 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true, margin: "-50px" }}
+                          whileHover={{ scale: 1.03, rotateX: 5, rotateY: -5, zIndex: 10 }}
+                          transition={{
+                            opacity: { delay: i * 0.1 },
+                            y: { delay: i * 0.1 },
+                            type: "spring", stiffness: 300, damping: 20
+                          }}
+                          key={category._id}
+                          onClick={() => navigate("/home/create-request", { state: { categoryName: category.name } })}
+                          className="relative h-56 rounded-[2rem] text-left overflow-hidden group shadow-[0_6px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.12)] transition-all duration-500 border border-[#EBE6DA] dark:border-gray-700/50 bg-white dark:bg-[#132320]"
+                        >
+                          {catImage ? (
+                            <img
+                              src={catImage}
+                              alt={category.name}
+                              className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out z-0"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-navy to-[#132823] flex items-center justify-center overflow-hidden z-0">
+                              <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#10B981_1px,transparent_1px)] [background-size:16px_16px]" />
+                              <div className="opacity-20 transform scale-[2.8] group-hover:scale-[3.2] transition-transform duration-700 text-white pointer-events-none">
+                                {getCategoryIcon(category.name)}
+                              </div>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent dark:from-navy/95 dark:via-navy/40 dark:to-transparent z-10 transition-opacity duration-500 group-hover:opacity-80"></div>
+
+                          <div className="absolute inset-0 p-5 sm:p-6 flex flex-col justify-end z-20">
+                            <div className="w-12 h-12 mb-4 rounded-2xl bg-white/15 dark:bg-white/10 backdrop-blur-xl flex items-center justify-center text-white border border-white/20 shadow-lg group-hover:bg-emerald-700 dark:group-hover:bg-accent group-hover:border-emerald-700 dark:group-hover:border-accent group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-500">
+                              {getCategoryIcon(category.name)}
+                            </div>
+                            <h3 className="font-bold text-white text-xl tracking-wide group-hover:text-emerald-300 dark:group-hover:text-accent-light transition-colors">{category.name}</h3>
+                            <p className="text-sm text-gray-200 dark:text-gray-300 mt-1.5 line-clamp-1 font-medium opacity-90 group-hover:opacity-100 transition-opacity">{category.description || (isOther ? 'Custom or specialized service' : 'Premium service')}</p>
+                          </div>
+                        </motion.button>
+                      );
+                    })}
                 </div>
               )}
             </section>
@@ -353,38 +347,42 @@ export default function CustomerHome() {
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="bg-white dark:bg-gradient-to-br dark:from-[#0D1E1B] dark:via-[#122B26] dark:to-[#0F352E] rounded-[2rem] p-8 text-slate-900 dark:text-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#EBE6DA] dark:border-gray-800 relative overflow-hidden group"
+              className="bg-white dark:bg-gradient-to-br dark:from-[#0D1E1B] dark:via-[#122B26] dark:to-[#0F352E] rounded-[2rem] p-5 sm:p-8 text-slate-900 dark:text-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#EBE6DA] dark:border-gray-800 relative overflow-hidden group"
             >
               <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 dark:bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-emerald-500/10 dark:group-hover:bg-accent/20 transition-colors duration-700"></div>
               <div className="absolute bottom-0 left-0 w-32 h-32 bg-accent/10 rounded-full -ml-10 -mb-10 blur-xl"></div>
 
               <h3 className="text-xl font-extrabold mb-6 relative z-10">Quick Actions</h3>
-              <div className="grid grid-cols-3 gap-3 relative z-10">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 relative z-10">
                 <motion.button
                   onClick={() => navigate("/services")}
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
-                  className="bg-[#F7F5EE] hover:bg-[#EFECE2] dark:bg-white/10 dark:hover:bg-white/20 p-4 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 border border-[#E5DEC9] dark:border-white/5 shadow-xs cursor-pointer"
+                  className="bg-[#F7F5EE] hover:bg-[#EFECE2] dark:bg-white/10 dark:hover:bg-white/20 p-2.5 sm:p-4 rounded-2xl flex flex-col items-center justify-center gap-2 sm:gap-3 transition-all duration-300 border border-[#E5DEC9] dark:border-white/5 shadow-xs cursor-pointer"
                 >
-                  <SearchIcon className="w-6 h-6 text-emerald-700 dark:text-accent-light drop-shadow-sm" />
-                  <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">Find Service</span>
+                  <SearchIcon className="w-5 sm:w-6 h-5 sm:h-6 text-emerald-700 dark:text-accent-light drop-shadow-sm" />
+                  <span className="text-[11px] sm:text-sm font-bold text-slate-800 dark:text-white">Find Service</span>
                 </motion.button>
                 <motion.button
                   onClick={() => navigate("/home/history")}
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
-                  className="bg-[#F7F5EE] hover:bg-[#EFECE2] dark:bg-white/10 dark:hover:bg-white/20 p-4 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 border border-[#E5DEC9] dark:border-white/5 shadow-xs cursor-pointer"
+                  className="bg-[#F7F5EE] hover:bg-[#EFECE2] dark:bg-white/10 dark:hover:bg-white/20 p-2.5 sm:p-4 rounded-2xl flex flex-col items-center justify-center gap-2 sm:gap-3 transition-all duration-300 border border-[#E5DEC9] dark:border-white/5 shadow-xs cursor-pointer"
                 >
-                  <Clock className="w-6 h-6 text-emerald-700 dark:text-accent-light drop-shadow-sm" />
-                  <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">History</span>
+                  <Clock className="w-5 sm:w-6 h-5 sm:h-6 text-emerald-700 dark:text-accent-light drop-shadow-sm" />
+                  <span className="text-[11px] sm:text-sm font-bold text-slate-800 dark:text-white">History</span>
                 </motion.button>
                 <motion.button
+                  onClick={() => navigate("/home/messages")}
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
-                  className="bg-[#F7F5EE] hover:bg-[#EFECE2] dark:bg-white/10 dark:hover:bg-white/20 p-4 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 border border-[#E5DEC9] dark:border-white/5 shadow-xs cursor-pointer"
+                  className="bg-[#F7F5EE] hover:bg-[#EFECE2] dark:bg-white/10 dark:hover:bg-white/20 p-2.5 sm:p-4 rounded-2xl flex flex-col items-center justify-center gap-2 sm:gap-3 transition-all duration-300 border border-[#E5DEC9] dark:border-white/5 shadow-xs cursor-pointer relative"
                 >
-                  <MessageSquare className="w-6 h-6 text-emerald-700 dark:text-accent-light drop-shadow-sm" />
-                  <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">Messages</span>
+                  <MessageSquare className="w-5 sm:w-6 h-5 sm:h-6 text-emerald-700 dark:text-accent-light drop-shadow-sm" />
+                  <span className="text-[11px] sm:text-sm font-bold text-slate-800 dark:text-white">Messages</span>
+                  <div className="absolute top-2 right-2">
+                    <MessagesUnreadBadge size="sm" />
+                  </div>
                 </motion.button>
               </div>
             </motion.section>
@@ -394,7 +392,7 @@ export default function CustomerHome() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
-              className="bg-white dark:bg-[#132320]/90 backdrop-blur-xl rounded-[2rem] p-8 border border-[#EBE6DA] dark:border-gray-800/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)]"
+              className="bg-white dark:bg-[#132320]/90 backdrop-blur-xl rounded-[2rem] p-5 sm:p-8 border border-[#EBE6DA] dark:border-gray-800/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)]"
             >
               <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mb-6">Recent Booking</h3>
 
@@ -410,7 +408,7 @@ export default function CustomerHome() {
                       {new Date(recentJob.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <h4 className="font-extrabold text-slate-900 dark:text-white mb-2 text-lg">{recentJob.category?.name || 'Premium Service'}</h4>
+                  <h4 className="font-extrabold text-slate-900 dark:text-white mb-2 text-lg">{formatJobCategory(recentJob)}</h4>
                   {recentJob.worker ? (
                     <div className="flex items-center gap-3 mt-4 bg-white dark:bg-gray-800/80 p-2.5 rounded-xl border border-[#EBE6DA] dark:border-gray-700/60 shadow-sm">
                       <div className="w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-700 overflow-hidden border border-gray-100 dark:border-gray-700">

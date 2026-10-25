@@ -1,9 +1,10 @@
 import { useState, FormEvent } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { registerUser } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
-import { LogoIcon } from "../../components/Logo";
+import { Logo } from "../../components/Logo";
 import { UserRole } from "../../types";
 
 export default function Signup() {
@@ -61,20 +62,20 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAF9F5] dark:bg-[#0B1513] px-4 py-10 transition-colors duration-300">
-      <div className="w-full max-w-sm bg-white dark:bg-[#132320] rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#EBE6DA] dark:border-gray-800 p-8">
+    <div className="min-h-screen flex items-center justify-center bg-[#FAF9F5] dark:bg-[#0B1513] px-4 py-8 sm:py-10 transition-colors duration-300">
+      <div className="w-full max-w-sm bg-white dark:bg-[#132320] rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#EBE6DA] dark:border-gray-800 p-5 sm:p-8">
         <div className="flex justify-center mb-3">
-          <LogoIcon className="w-12 h-12 rounded-xl shadow-md" />
+          <Logo className="w-12 h-12" />
         </div>
         <h1 className="text-2xl font-semibold text-navy dark:text-white text-center mb-1">Create your account</h1>
         <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-6">Join Servixo in seconds</p>
 
 
-        <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
+        <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 mb-6">
           <button
             type="button"
             onClick={() => setRole("customer")}
-            className={`flex-1 text-sm font-medium py-2 rounded-md transition ${role === "customer" ? "bg-white text-navy shadow-sm" : "text-gray-500"
+            className={`flex-1 text-sm font-medium py-2.5 rounded-md transition min-h-[40px] flex items-center justify-center ${role === "customer" ? "bg-white dark:bg-[#142623] text-navy dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"
               }`}
           >
             Customer
@@ -82,7 +83,7 @@ export default function Signup() {
           <button
             type="button"
             onClick={() => setRole("worker")}
-            className={`flex-1 text-sm font-medium py-2 rounded-md transition ${role === "worker" ? "bg-white text-navy shadow-sm" : "text-gray-500"
+            className={`flex-1 text-sm font-medium py-2.5 rounded-md transition min-h-[40px] flex items-center justify-center ${role === "worker" ? "bg-white dark:bg-[#142623] text-navy dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"
               }`}
           >
             Worker
@@ -90,7 +91,7 @@ export default function Signup() {
         </div>
 
         {errorMessage && (
-          <div className="bg-red-50 text-red-600 text-sm rounded-lg px-3 py-2 mb-4">
+          <div className="bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-transparent dark:border-red-800/50 text-sm rounded-lg px-3 py-2 mb-4">
             {errorMessage}
           </div>
         )}
@@ -102,7 +103,7 @@ export default function Signup() {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent font-medium"
+              className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent font-medium text-sm sm:text-base min-h-[42px]"
               placeholder="Your name"
             />
           </div>
@@ -113,7 +114,7 @@ export default function Signup() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent font-medium"
+              className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent font-medium text-sm sm:text-base min-h-[42px]"
               placeholder="you@example.com"
             />
           </div>
@@ -123,7 +124,7 @@ export default function Signup() {
               required
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent font-medium"
+              className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent font-medium text-sm sm:text-base min-h-[42px]"
               placeholder="+919876543210"
             />
           </div>
@@ -135,7 +136,7 @@ export default function Signup() {
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent font-medium"
+              className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent font-medium text-sm sm:text-base min-h-[42px]"
               placeholder="At least 6 characters"
             />
           </div>
@@ -146,7 +147,7 @@ export default function Signup() {
               required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent font-medium"
+              className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent font-medium text-sm sm:text-base min-h-[42px]"
               placeholder="Re-enter your password"
             />
           </div>
@@ -154,15 +155,22 @@ export default function Signup() {
           <button
             type="submit"
             disabled={mutation.isPending}
-            className="w-full bg-navy text-white rounded-lg py-2.5 font-medium hover:bg-navy/90 transition disabled:opacity-60"
+            className="w-full bg-navy text-white rounded-lg py-2.5 sm:py-3 font-semibold hover:bg-navy/90 transition disabled:opacity-60 min-h-[44px] flex items-center justify-center gap-2"
           >
-            {mutation.isPending ? "Creating account..." : "Create Account"}
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Creating account...</span>
+              </>
+            ) : (
+              "Create Account"
+            )}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
           Already have an account?{" "}
-          <Link to="/login" className="text-accent font-medium hover:underline">
+          <Link to="/login" className="text-accent font-medium hover:underline inline-block py-1">
             Log in
           </Link>
         </p>

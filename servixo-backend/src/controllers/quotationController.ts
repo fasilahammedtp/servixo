@@ -7,6 +7,7 @@ import { Notification } from "../models/Notification";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { sendRealtimeNotification } from "../config/socket";
 import { sendJobHiredEmail, sendQuoteReceivedEmail } from "../utils/email";
+import { getJobCategoryDisplay } from "../utils/jobUtils";
 
 export const createQuotation = asyncHandler(async (req: Request, res: Response) => {
   const { jobId, price, message, etaMinutes } = req.body as {
@@ -63,7 +64,7 @@ export const createQuotation = asyncHandler(async (req: Request, res: Response) 
 
   try {
     const workerName = (worker.user as any)?.name || "A worker";
-    const categoryName = (job.category as any)?.name || "service";
+    const categoryName = getJobCategoryDisplay(job);
 
     const notification = await Notification.create({
       recipient: customerId,
@@ -84,7 +85,7 @@ export const createQuotation = asyncHandler(async (req: Request, res: Response) 
     const customerName = customerUser?.name || "Customer";
     const workerUser = worker.user as any;
     const workerName = workerUser?.name || "Service Professional";
-    const categoryName = (job.category as any)?.name || "Service";
+    const categoryName = getJobCategoryDisplay(job);
 
     if (customerEmail) {
       await sendQuoteReceivedEmail({
@@ -98,7 +99,7 @@ export const createQuotation = asyncHandler(async (req: Request, res: Response) 
         etaMinutes: etaMinutes || 30,
         workerMessage: message,
       });
-      console.log(`[Quote Received Email SUCCESS] Email notification sent to customer: ${customerEmail}`);
+      console.log("[Quote Received Email SUCCESS] Email notification sent to customer");
     }
   } catch (emailErr) {
     console.error("[Quote Received Email ERROR]: Failed to send email to customer:", emailErr);
@@ -221,7 +222,7 @@ export const acceptQuotation = asyncHandler(async (req: Request, res: Response) 
   try {
     const workerUser = (quotation.worker as any)?.user;
     const workerUserId = workerUser?._id?.toString() || workerUser?.id?.toString() || workerUser?.toString();
-    const categoryName = (job.category as any)?.name || "service";
+    const categoryName = getJobCategoryDisplay(job);
 
     if (workerUserId) {
       const notification = await Notification.create({
@@ -242,7 +243,7 @@ export const acceptQuotation = asyncHandler(async (req: Request, res: Response) 
     const workerUser = (quotation.worker as any)?.user;
     const workerEmail = workerUser?.email;
     const workerName = workerUser?.name || "Service Professional";
-    const categoryName = (job.category as any)?.name || "Service";
+    const categoryName = getJobCategoryDisplay(job);
     const customerUser = job.customer as any;
     const customerName = customerUser?.name || "Customer";
     const customerPhone = customerUser?.phone;
@@ -257,7 +258,7 @@ export const acceptQuotation = asyncHandler(async (req: Request, res: Response) 
         customerName,
         customerPhone,
       });
-      console.log(`[Job Hired Email SUCCESS] Email notification sent to worker: ${workerEmail}`);
+      console.log("[Job Hired Email SUCCESS] Email notification sent to worker");
     }
   } catch (emailErr) {
     console.error("[Job Hired Email ERROR]: Failed to send email to worker:", emailErr);

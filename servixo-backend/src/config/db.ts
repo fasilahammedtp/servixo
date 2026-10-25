@@ -4,7 +4,7 @@ export async function connectDB(): Promise<void> {
   const uri = process.env.MONGO_URI;
 
   if (!uri) {
-    console.error("MONGO_URI is not set in .env");
+    console.error("MongoDB connection failed: MONGO_URI is not set in environment variables");
     process.exit(1);
   }
 

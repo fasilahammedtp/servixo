@@ -1,6 +1,18 @@
 import nodemailer from "nodemailer";
 
 function getTransporter() {
+  if (process.env.RESEND_API_KEY) {
+    return nodemailer.createTransport({
+      host: "smtp.resend.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: "resend",
+        pass: process.env.RESEND_API_KEY,
+      },
+    });
+  }
+
   return nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -11,8 +23,14 @@ function getTransporter() {
 }
 
 function getFromEmail() {
+  if (process.env.EMAIL_FROM) {
+    return process.env.EMAIL_FROM.includes("<")
+      ? process.env.EMAIL_FROM
+      : `"Servixo" <${process.env.EMAIL_FROM}>`;
+  }
   return `"Servixo" <${process.env.GMAIL_USER || "noreply@servixo.com"}>`;
 }
+
 
 export async function sendOtpEmail(to: string, otp: string) {
   return await getTransporter().sendMail({
