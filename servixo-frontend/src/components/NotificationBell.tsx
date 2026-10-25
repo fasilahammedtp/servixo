@@ -71,7 +71,7 @@ export function NotificationBell() {
 
   // Automatically mark visible unread notifications as read after 1.5 seconds of opening dropdown
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (isOpen && unreadCount > 0 && !markAllReadMutation.isPending) {
       timer = setTimeout(() => {
         markAllReadMutation.mutate();
