@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Logo } from "./Logo";
+import { SOCIAL_LINKS } from "../constants/socialLinks";
 
 export function Footer() {
   return (
@@ -19,22 +20,49 @@ export function Footer() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-4">
-          <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="text-white/40 hover:text-accent transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M22 12a10 10 0 10-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.2c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0022 12z" />
-            </svg>
-          </a>
-          <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="text-white/40 hover:text-accent transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <a
+            href={SOCIAL_LINKS.INSTAGRAM}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Instagram"
+            className="w-10 h-10 flex items-center justify-center rounded-lg text-white/40 hover:text-accent transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-navy dark:focus-visible:ring-offset-[#0A1412]"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <rect x="3" y="3" width="18" height="18" rx="5" />
               <circle cx="12" cy="12" r="4" />
               <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
             </svg>
           </a>
-          <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Twitter / X" className="text-white/40 hover:text-accent transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.9 2H22l-7.6 8.7L23.3 22h-7.1l-5.5-7.2L4.3 22H1.2l8.1-9.3L1 2h7.3l5 6.6L18.9 2zm-1.2 18h1.8L7.4 3.9H5.5L17.7 20z" />
+          <a
+            href={SOCIAL_LINKS.LINKEDIN}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="LinkedIn"
+            className="w-10 h-10 flex items-center justify-center rounded-lg text-white/40 hover:text-accent transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-navy dark:focus-visible:ring-offset-[#0A1412]"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+              <rect x="2" y="9" width="4" height="12" />
+              <circle cx="4" cy="4" r="2" />
             </svg>
           </a>
         </div>
